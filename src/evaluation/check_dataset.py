@@ -5,7 +5,7 @@ from pathlib import Path
 def check_dataset():
 
     file = Path(
-        "data/processed/train_sft.json"
+        "data/processed/sft_train.json"
     )
 
 
