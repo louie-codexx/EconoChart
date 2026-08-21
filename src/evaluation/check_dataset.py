@@ -1,70 +1,39 @@
 import json
-from pathlib import Path
+
+
+DATA_PATH = "data/processed/sft_train.json"
 
 
 def check_dataset():
 
-    file = Path(
-        "data/processed/sft_train.json"
-    )
-
-
     with open(
-        file,
+        DATA_PATH,
         "r",
         encoding="utf-8"
     ) as f:
-
         data = json.load(f)
 
 
+    print(f"样本数量: {len(data)}")
+
+
+    print("\n第一个样本:")
 
     print(
-        "样本数量:",
-        len(data)
+        json.dumps(
+            data[0],
+            ensure_ascii=False,
+            indent=2
+        )
     )
 
 
-    missing = []
+    print("\n字段检查:")
 
-
-    for item in data:
-
-        image_path = Path(
-            item["messages"][0]["content"][0]["image"]
-        )
-
-
-        if not image_path.exists():
-
-            missing.append(
-                str(image_path)
-            )
-
-
-
-    if missing:
-
-        print(
-            "缺失图片:"
-        )
-
-        for m in missing:
-            print(m)
-
-    else:
-
-        print(
-            "所有图片路径正常 ✅"
-        )
-
-
-
-    print("\n随机样本:")
-    print(data[0])
-
+    print(
+        data[0].keys()
+    )
 
 
 if __name__ == "__main__":
-
     check_dataset()
