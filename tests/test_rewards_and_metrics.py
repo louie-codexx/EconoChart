@@ -6,6 +6,7 @@ import unittest
 from econochart.config import ROOT
 from econochart.data.schema import parse_ground_truth
 from econochart.evaluation.compare import compare_rows
+from econochart.evaluation.inference import _build_messages
 from econochart.evaluation.metrics import (
     aggregate_metrics,
     anls,
@@ -129,6 +130,14 @@ class RewardAndMetricTests(unittest.TestCase):
         mismatched[0]["question"] = "changed"
         with self.assertRaises(ValueError):
             _align_existing_predictions(self.rows, mismatched)
+
+    def test_inference_messages_use_multimodal_content_blocks(self) -> None:
+        image = object()
+        messages = _build_messages(self.rows[0], image)
+        self.assertTrue(all(isinstance(message["content"], list) for message in messages))
+        self.assertEqual(messages[0]["content"][0]["type"], "text")
+        self.assertEqual(messages[1]["content"][0]["type"], "image")
+        self.assertIs(messages[1]["content"][0]["image"], image)
 
 
 if __name__ == "__main__":
