@@ -135,7 +135,9 @@ def format_reward(
         positions = section_positions(text, sections)
         coverage = sum(position >= 0 for position in positions) / len(sections)
         present_positions = [position for position in positions if position >= 0]
-        ordered = present_positions == sorted(present_positions)
+        # An empty list is trivially sorted, but a completion that contains no
+        # required section must not receive the ordering bonus.
+        ordered = bool(present_positions) and present_positions == sorted(present_positions)
         duplicates = sum(max(0, text.count(f"【{section}】") - 1) for section in sections)
         score = 0.85 * coverage + 0.15 * float(ordered)
         score -= min(0.25, duplicates * 0.08)

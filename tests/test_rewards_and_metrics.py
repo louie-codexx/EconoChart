@@ -45,6 +45,15 @@ class RewardAndMetricTests(unittest.TestCase):
         incorrect = score_completion("所有指标完全稳定，没有风险。", row["ground_truth"])["overall"]
         self.assertLess(incorrect, reference)
 
+    def test_missing_required_sections_receive_zero_format_reward(self) -> None:
+        row = next(
+            item
+            for item in self.all_rows
+            if parse_ground_truth(item["ground_truth"]).get("required_sections")
+        )
+        score = score_completion("所有指标完全稳定，没有风险。", row["ground_truth"])
+        self.assertEqual(score["format"], 0.0)
+
     def test_numeric_reward_penalizes_unsupported_and_misassigned_values(self) -> None:
         row = next(
             item
