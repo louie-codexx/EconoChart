@@ -19,10 +19,8 @@ model:
 data:
   test:
     - path: data/generated/public/chartqa/annotations/test.jsonl
-      max_samples: 512
     - path: data/generated/public/chartqapro/annotations/test.jsonl
       optional: true
-      max_samples: 512
 
 generation:
   max_new_tokens: 128

@@ -19,9 +19,6 @@ model:
 data:
   test:
     - path: data/generated/econochart_v2/annotations/test.jsonl
-      # Fixed deterministic panel reused for every Base/SFT/GRPO comparison.
-      # The full 2,496-row holdout is reserved for a final run if needed.
-      max_samples: 512
 
 generation:
   max_new_tokens: 320
