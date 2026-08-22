@@ -1,0 +1,9 @@
+extends: configs/train/sft_qlora_r8_ablation.yaml
+
+experiment:
+  id: sft_qlora_r8_lr2e4_screen
+  hypothesis: At the selected 2e-4 learning rate, rank 8 may match rank 16 with half the adapter capacity.
+
+training:
+  output_dir: outputs/screen/sft_qlora_r8_lr2e4
+  learning_rate: 0.0002

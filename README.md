@@ -67,11 +67,12 @@ econochart-preflight --stage sft --config configs/train/sft_qlora_smoke.yaml \
   --report outputs/preflight/sft_smoke.json
 econochart-sft --config configs/train/sft_qlora_smoke.yaml
 
-# 固定 4,800 条筛选集和 512 条 val 面板；只比较高价值候选。
-econochart-sft --config configs/train/sft_qlora_r8_ablation.yaml
-econochart-sft --config configs/train/sft_qlora_r16_screen.yaml
+# 第一阶段固定 r=16，只筛选学习率，避免 rank 与学习率混杂。
 econochart-sft --config configs/train/sft_qlora_lr5e5_ablation.yaml
+econochart-sft --config configs/train/sft_qlora_r16_screen.yaml
 econochart-sft --config configs/train/sft_qlora_lr2e4_ablation.yaml
+
+# 第二阶段只在胜出学习率下比较 r=8/16；具体条件配置见 AutoDL 手册。
 
 # 根据固定 val 面板选择参数后，再运行 9,600 条、2 epochs 的正式 SFT。
 econochart-sft --config configs/train/sft_qlora_4090.yaml

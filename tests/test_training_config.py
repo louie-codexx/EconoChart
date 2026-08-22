@@ -78,6 +78,42 @@ class TrainingConfigTests(unittest.TestCase):
         self.assertEqual(config["model"]["quantization"]["mode"], "4bit")
         self.assertEqual(config["training"]["learning_rate"], 0.0001)
 
+    def test_rank_candidates_match_each_selected_learning_rate(self) -> None:
+        pairs = (
+            (
+                "configs/train/sft_qlora_r8_lr5e5_screen.yaml",
+                "configs/train/sft_qlora_lr5e5_ablation.yaml",
+                0.00005,
+            ),
+            (
+                "configs/train/sft_qlora_r8_ablation.yaml",
+                "configs/train/sft_qlora_r16_screen.yaml",
+                0.0001,
+            ),
+            (
+                "configs/train/sft_qlora_r8_lr2e4_screen.yaml",
+                "configs/train/sft_qlora_lr2e4_ablation.yaml",
+                0.0002,
+            ),
+        )
+        for rank8_path, rank16_path, learning_rate in pairs:
+            rank8 = load_config(rank8_path)
+            rank16 = load_config(rank16_path)
+            self.assertEqual(rank8["adapter"]["r"], 8)
+            self.assertEqual(rank16["adapter"]["r"], 16)
+            self.assertEqual(rank8["adapter"]["alpha"], 16)
+            self.assertEqual(rank16["adapter"]["alpha"], 32)
+            self.assertEqual(rank8["training"]["learning_rate"], learning_rate)
+            self.assertEqual(rank16["training"]["learning_rate"], learning_rate)
+            self.assertEqual(rank8["training"]["num_train_epochs"], 1)
+            self.assertEqual(rank16["training"]["num_train_epochs"], 1)
+            self.assertEqual(
+                rank8["data"]["train"][0]["path"],
+                rank16["data"]["train"][0]["path"],
+            )
+            self.assertEqual(rank8["data"]["train"][0]["expected_rows"], 4800)
+            self.assertEqual(rank16["data"]["train"][0]["expected_rows"], 4800)
+
     def test_development_evaluation_explicitly_accepts_validation_split(self) -> None:
         config = {
             "seed": 20260821,

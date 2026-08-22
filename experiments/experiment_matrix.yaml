@@ -58,9 +58,17 @@ experiments:
   - id: S2_rank_ablation
     stage: sft_ablation
     status: code_ready
-    configs:
-      - configs/train/sft_qlora_r8_ablation.yaml
-      - configs/train/sft_qlora_r16_screen.yaml
+    prerequisite: S3_learning_rate_ablation selects the learning rate with rank fixed at 16.
+    matched_learning_rate_configs:
+      5e-5:
+        - configs/train/sft_qlora_r8_lr5e5_screen.yaml
+        - configs/train/sft_qlora_lr5e5_ablation.yaml
+      1e-4:
+        - configs/train/sft_qlora_r8_ablation.yaml
+        - configs/train/sft_qlora_r16_screen.yaml
+      2e-4:
+        - configs/train/sft_qlora_r8_lr2e4_screen.yaml
+        - configs/train/sft_qlora_lr2e4_ablation.yaml
     conditional_configs: [configs/train/sft_qlora_r32_ablation.yaml]
     data_budget: 4,800 rows x 1 epoch; compare on the same val_512 IDs.
     single_factor: adapter rank (8/16; run 32 only if 16 is capacity-limited), alpha fixed at 2r
@@ -75,7 +83,8 @@ experiments:
       - configs/train/sft_qlora_lr2e4_ablation.yaml
     data_budget: 4,800 rows x 1 epoch; compare on the same val_512 IDs.
     single_factor: learning rate (5e-5/1e-4/2e-4)
-    decision: Balance convergence, stability, and external capability retention.
+    fixed_anchor: rank 16, alpha 32
+    decision: Select by the fixed internal validation panel, optimization stability, and efficiency; never use external test results for selection.
 
   - id: S4_quantization_ablation
     stage: sft_ablation

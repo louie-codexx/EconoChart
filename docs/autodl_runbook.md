@@ -124,16 +124,25 @@ smoke 只回答工程问题，不用于报告模型效果：
 
 ## 6. 参数筛选、主 SFT 与断点续训
 
-先在固定的 4,800 条嵌套筛选集上各跑 1 epoch。只比较四个能改变决策的候选；r=32、BF16 LoRA 和 ChartQA 混合由错误分析触发，不默认执行：
+所有候选都使用固定的 4,800 条嵌套筛选集、1 epoch、同一 seed、有效 batch、图像像素范围、LoRA target modules、优化器和调度器。完整 test 不参与选择。
+
+先在 512 条 val 面板上生成一次未微调 Base 对照。它只用于开发阶段配对比较，不替代已经冻结的 2,496 条正式 Base：
 
 ```bash
-econochart-sft --config configs/train/sft_qlora_r8_ablation.yaml
-econochart-sft --config configs/train/sft_qlora_r16_screen.yaml
+econochart-eval \
+  --config configs/eval/development_val_512.yaml \
+  --output-dir outputs/evaluation/base_val512_v1
+```
+
+第一阶段固定 `r=16, alpha=32`，只比较三个对数尺度相邻的学习率。`r=16` 是已经通过 4090 smoke 的中间容量锚点，不是预先认定的最优值：
+
+```bash
 econochart-sft --config configs/train/sft_qlora_lr5e5_ablation.yaml
+econochart-sft --config configs/train/sft_qlora_r16_screen.yaml
 econochart-sft --config configs/train/sft_qlora_lr2e4_ablation.yaml
 ```
 
-每个候选都用同一个 512 条 val 面板做确定性生成评测。下面以 r16/lr1e-4 为例，其他候选替换 adapter 和输出目录：
+每个候选都用同一个 512 条 val 面板做确定性生成评测。下面以 `r16/lr1e-4` 为例，其他候选替换 adapter 和输出目录：
 
 ```bash
 econochart-preflight --stage eval \
@@ -147,7 +156,22 @@ econochart-eval \
   --output-dir outputs/evaluation/screen_r16_lr1e4_val512
 ```
 
-根据 val 指标、峰值显存、吞吐、稳定性和错误切片选择参数；此时不要查看完整 test。若胜出者不是中心候选，先把选择结果及理由写入私有记录，并把正式配置的 rank/alpha/LR 更新为胜出值。然后运行 9,600 条、2 epochs 的主 SFT：
+第二阶段固定第一阶段胜出的学习率，只比较 `r=8` 与 `r=16`。按胜出学习率选择且只运行对应的 `r=8` 配置；`r=16` 结果直接复用第一阶段结果：
+
+```bash
+# lr=5e-5 胜出时
+econochart-sft --config configs/train/sft_qlora_r8_lr5e5_screen.yaml
+
+# lr=1e-4 胜出时
+econochart-sft --config configs/train/sft_qlora_r8_ablation.yaml
+
+# lr=2e-4 胜出时
+econochart-sft --config configs/train/sft_qlora_r8_lr2e4_screen.yaml
+```
+
+选择以 corrected overall 为主，联合 numeric recall、risk、trend、evidence、困难样本切片、token-cap 命中率、峰值显存、吞吐和稳定性；teacher-forced eval loss 只作辅助。候选之间使用固定 ID 的 paired bootstrap；若质量差异没有充分证据，学习率保留中心值 `1e-4`，rank 选择更小的 `r=8`。`r=32` 只有在 `r=16` 明显优于 `r=8` 且仍存在容量不足证据时才运行。此时不要查看完整 test 或外部测试结果。
+
+若胜出者不是中心候选，先把选择结果及理由写入私有记录，并把正式配置的 rank/alpha/LR 更新为胜出值。然后运行 9,600 条、2 epochs 的主 SFT：
 
 ```bash
 econochart-sft --config configs/train/sft_qlora_4090.yaml
