@@ -145,7 +145,24 @@ def load_trainable_adapter(model: Any, adapter_path: str) -> Any:
     return load_adapter(model, adapter_path, trainable=True)
 
 
+def _logical_parameter_numel(parameter: Any) -> int:
+    """Count logical parameters, undoing bitsandbytes 4-bit storage packing."""
+    count = int(parameter.numel())
+    if count == 0 and hasattr(parameter, "ds_numel"):
+        count = int(parameter.ds_numel)
+    if parameter.__class__.__name__ == "Params4bit":
+        if hasattr(parameter, "element_size"):
+            storage_bytes = int(parameter.element_size())
+        elif hasattr(parameter, "quant_storage"):
+            storage_bytes = int(parameter.quant_storage.itemsize)
+        else:
+            storage_bytes = 1
+        count *= 2 * storage_bytes
+    return count
+
+
 def trainable_parameter_summary(model: Any) -> dict[str, Any]:
+    """Report logical model parameters rather than packed 4-bit storage elements."""
     component_parameters = {"vision": 0, "projector": 0, "language_or_other": 0}
     trainable_tensors = 0
     for name, parameter in model.named_parameters():
@@ -159,9 +176,9 @@ def trainable_parameter_summary(model: Any) -> dict[str, Any]:
             component = "vision"
         else:
             component = "language_or_other"
-        component_parameters[component] += parameter.numel()
+        component_parameters[component] += _logical_parameter_numel(parameter)
     trainable = sum(component_parameters.values())
-    total = sum(parameter.numel() for parameter in model.parameters())
+    total = sum(_logical_parameter_numel(parameter) for parameter in model.parameters())
     return {
         "trainable_parameters": trainable,
         "total_parameters": total,

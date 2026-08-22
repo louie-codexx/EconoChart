@@ -72,6 +72,12 @@ datasets_cache/
 /tensorboard/
 *.log
 
+# Detailed experiment diaries are private review material. Keep only the
+# directory placeholder, public protocol/template, and curated summaries.
+/experiments/records/*
+!/experiments/records/.gitkeep
+/experiments/private/
+
 
 # ==============================
 # Machine-local configuration

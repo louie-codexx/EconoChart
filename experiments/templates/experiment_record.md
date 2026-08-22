@@ -1,5 +1,7 @@
 # Experiment: `<experiment_id>`
 
+> Private working record: copy this template into `experiments/records/`. That directory is ignored by Git. Publish only a reviewed, redacted summary under `experiments/results/` when the evidence is ready.
+
 ## 1. Identity
 
 | Field | Value |
@@ -45,6 +47,16 @@ List every other config difference. If more than one primary factor changed, exp
 | Optional acceleration | `none / flash-attn / other` |
 
 Preflight report path/hash:
+
+### Runtime parameter decisions
+
+Record only material settings that affect model quality, memory/cost, reproducibility, experimental comparability, or the decision to continue. Do not inventory every non-default environment value. For each key choice, include why it was selected and what evidence would justify changing it.
+
+| Parameter | Observed/default | Selected | Why selected | Alternative not chosen | Revisit condition | Verification |
+|---|---:|---:|---|---|---|---|
+| `<material parameter only>` | | | | | | |
+
+Routine shell commands, successful imports and unchanged defaults belong in raw logs, not this table.
 
 ## 5. Data lineage
 
