@@ -1,0 +1,60 @@
+experiment:
+  id: sft_qlora_smoke
+  hypothesis: The final SFT data, processor, quantized model, adapter, collator, and checkpoint path are compatible.
+
+seed: 20260821
+
+model:
+  name_or_path: Qwen/Qwen3-VL-4B-Instruct
+  dtype: bfloat16
+  min_pixels: 200704
+  max_pixels: 401408
+  gradient_checkpointing: true
+  quantization:
+    mode: 4bit
+    quant_type: nf4
+    compute_dtype: bfloat16
+    double_quant: true
+
+adapter:
+  method: qlora
+  r: 8
+  alpha: 16
+  dropout: 0.05
+  bias: none
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+  train_vision: false
+  train_projector: false
+
+data:
+  train:
+    - path: data/samples/econochart_v2/annotations/train.jsonl
+      max_samples: 8
+  eval:
+    - path: data/samples/econochart_v2/annotations/val.jsonl
+      max_samples: 4
+
+training:
+  output_dir: outputs/smoke/sft_qlora
+  max_steps: 2
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 1
+  learning_rate: 0.0001
+  optim: paged_adamw_8bit
+  bf16: true
+  tf32: true
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs: {use_reentrant: false}
+  max_length: null
+  completion_only_loss: true
+  packing: false
+  padding_free: false
+  eval_strategy: steps
+  eval_steps: 1
+  save_strategy: 'no'
+  logging_steps: 1
+  report_to: []
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  skip_memory_metrics: false

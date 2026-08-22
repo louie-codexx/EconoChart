@@ -1,0 +1,68 @@
+{
+  "dataset": "econochart-v2.0",
+  "builder_version": "2.0.0",
+  "seed": 20260821,
+  "num_companies": 8,
+  "num_charts": 16,
+  "num_records": 64,
+  "num_grpo_records": 36,
+  "split_entities": {
+    "train": 6,
+    "val": 1,
+    "test": 1
+  },
+  "split_records": {
+    "train": 48,
+    "val": 8,
+    "test": 8
+  },
+  "industry_distribution": {
+    "cloud_services": 2,
+    "ecommerce": 2,
+    "fintech": 3,
+    "saas": 1
+  },
+  "scenario_distribution": {
+    "cost_pressure": 2,
+    "demand_slowdown": 1,
+    "high_growth": 1,
+    "margin_expansion": 1,
+    "monetization_weakness": 1,
+    "recovery": 1,
+    "stable": 1
+  },
+  "task_distribution": {
+    "comprehensive_report": 4,
+    "decision_support": 12,
+    "numerical_reasoning": 11,
+    "relationship_analysis": 13,
+    "risk_diagnosis": 6,
+    "trend_analysis": 2,
+    "value_retrieval": 16
+  },
+  "view_distribution": {
+    "composition": 4,
+    "dashboard": 16,
+    "financial": 32,
+    "growth": 8,
+    "operations": 4
+  },
+  "difficulty_distribution": {
+    "easy": 12,
+    "hard": 35,
+    "medium": 17
+  },
+  "render": {
+    "width_px": 960,
+    "height_px": 576,
+    "dpi": 120,
+    "label_probability": 0.5
+  },
+  "checksums": {
+    "annotations/train.jsonl": "e89f53f6936ab6972e3622c27a3e43107eb2214da96b8820b8fb7b1ca0bfd53a",
+    "annotations/val.jsonl": "54c9af00e1803e5e5b35e1bca381c0bb46a3aa7b27741d8b4f3f541cac5b7b2c",
+    "annotations/test.jsonl": "cd27cd794baff923e57bbcae314fff4c997053acdce83e7b92afb4142a262c70",
+    "annotations/grpo_train.jsonl": "618e03019c1e3d4f682a7259063a8317105a0a0becff44151052254041e4bd75",
+    "raw/companies.jsonl": "0d1ba4a3eaf2286578455e0a015911fb69de292162d52a03e8302e91948ee11f"
+  }
+}

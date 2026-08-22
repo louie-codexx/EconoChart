@@ -1,0 +1,17 @@
+project:
+  name: econochart-v2
+  seed: 20260821
+
+data:
+  output_root: data/generated/econochart_v2
+  num_companies: 3000
+  split_ratios:
+    train: 0.80
+    val: 0.10
+    test: 0.10
+  render:
+    width_px: 1280
+    height_px: 768
+    dpi: 160
+    label_probability: 0.50
+    workers: 4

@@ -1,0 +1,12 @@
+extends: configs/train/sft_qlora_4090.yaml
+
+experiment:
+  id: sft_qlora_r8_ablation
+  hypothesis: Rank 8 may match rank 16 with fewer trainable parameters; compare quality and throughput.
+
+adapter:
+  r: 8
+  alpha: 16
+
+training:
+  output_dir: outputs/sft_qlora_r8_ablation

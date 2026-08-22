@@ -1,0 +1,39 @@
+experiment:
+  id: base_internal_v1
+  checkpoint_stage: base
+
+seed: 20260821
+
+model:
+  name_or_path: Qwen/Qwen3-VL-4B-Instruct
+  adapter_path: null
+  dtype: bfloat16
+  min_pixels: 200704
+  max_pixels: 802816
+  quantization:
+    mode: 4bit
+    quant_type: nf4
+    compute_dtype: bfloat16
+    double_quant: true
+
+data:
+  test:
+    - path: data/generated/econochart_v2/annotations/test.jsonl
+
+generation:
+  max_new_tokens: 320
+  do_sample: false
+  repetition_penalty: 1.0
+
+evaluation:
+  save_every: 25
+  reward_weights:
+    numeric: 0.35
+    trend: 0.20
+    format: 0.15
+    evidence: 0.15
+    risk: 0.10
+    length: 0.05
+
+training:
+  output_dir: outputs/evaluation/base_internal_v1

@@ -5,6 +5,15 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+/htmlcov/
+*.egg-info/
+/build/
+/dist/
 
 
 # ==============================
@@ -18,10 +27,20 @@ env/
 
 # ==============================
 # Dataset
-# 不上传训练数据
+# 完整训练数据不进入主仓库；仅提交数据卡、manifest 和小样例
 # ==============================
 
-/data/
+/data/*
+!/data/README.md
+!/data/manifests/
+!/data/manifests/**
+!/data/samples/
+!/data/samples/**
+
+# Hugging Face / datasets caches
+.cache/
+hf_cache/
+datasets_cache/
 
 
 # ==============================
@@ -29,19 +48,38 @@ env/
 # 不上传模型权重
 # ==============================
 
-checkpoints/
+/checkpoints/
+/artifacts/
+/models/
 *.pt
 *.pth
 *.bin
 *.safetensors
+*.ckpt
+*.gguf
+*.onnx
 
 
 # ==============================
 # Training outputs
 # ==============================
 
-outputs/
-logs/
+/outputs/
+/logs/
+/runs/
+/wandb/
+/mlruns/
+/tensorboard/
+*.log
+
+
+# ==============================
+# Machine-local configuration
+# ==============================
+
+configs/local*.yaml
+configs/*.local.yaml
+accelerate_config.yaml
 
 
 # ==============================
@@ -63,6 +101,19 @@ logs/
 # ==============================
 
 .env
+.env.*
+!.env.example
+
+
+# ==============================
+# Local planning workspace
+# 最终结论整理到 docs/ 和 experiments/，不展示内部工作记忆
+# ==============================
+
+/task_plan.md
+/findings.md
+/progress.md
+/.planning/
 
 
 # ==============================

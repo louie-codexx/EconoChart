@@ -1,0 +1,61 @@
+experiment:
+  id: sft_lora_r16_domain_ablation
+  hypothesis: BF16 LoRA may retain better base precision than QLoRA, at a materially higher memory cost.
+
+seed: 20260821
+
+model:
+  name_or_path: Qwen/Qwen3-VL-4B-Instruct
+  dtype: bfloat16
+  min_pixels: 200704
+  max_pixels: 602112       # 768 visual tokens to leave room for BF16 base weights
+  gradient_checkpointing: true
+  quantization: {mode: none}
+
+adapter:
+  method: lora
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  bias: none
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+  train_vision: false
+  train_projector: false
+
+data:
+  train:
+    - path: data/generated/econochart_v2/annotations/train.jsonl
+  eval:
+    - path: data/generated/econochart_v2/annotations/val.jsonl
+      max_samples: 512
+
+training:
+  output_dir: outputs/sft_lora_r16_domain_ablation
+  num_train_epochs: 2
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 0.0001
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  warmup_ratio: 0.03
+  lr_scheduler_type: cosine
+  optim: adamw_torch_fused
+  bf16: true
+  tf32: true
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs: {use_reentrant: false}
+  max_length: null
+  completion_only_loss: true
+  packing: false
+  padding_free: false
+  eval_strategy: steps
+  eval_steps: 250
+  save_strategy: steps
+  save_steps: 250
+  save_total_limit: 2
+  logging_steps: 10
+  report_to: [tensorboard]
+  remove_unused_columns: false
+  dataloader_num_workers: 4
+  skip_memory_metrics: false

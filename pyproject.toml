@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "econochart"
+version = "2.0.0"
+description = "Post-training Qwen3-VL for multimodal digital-economy chart reasoning."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{name = "EconoChart contributors"}]
+dependencies = [
+  "packaging>=24,<27",
+  "PyYAML>=6.0.2,<7",
+]
+
+[project.optional-dependencies]
+data = [
+  "datasets>=3.0,<5",
+  "matplotlib>=3.8,<4",
+  "numpy>=1.23.5,<3",
+  "Pillow>=10,<13",
+]
+train = [
+  "accelerate>=1.4,<2",
+  "bitsandbytes>=0.46,<0.50; platform_system == 'Linux'",
+  "datasets>=3.0,<5",
+  "matplotlib>=3.8,<4",
+  "numpy>=1.23.5,<3",
+  "peft>=0.18,<0.19",
+  "Pillow>=10,<13",
+  "rich>=13,<15",
+  "tensorboard>=2.18,<3",
+  "torch>=2.5",
+  "torchvision>=0.20",
+  "transformers>=4.57.1,<5.16",
+  "trl==0.28.0",
+]
+dev = [
+  "pytest>=8,<9",
+  "ruff>=0.12,<1",
+]
+
+[project.scripts]
+econochart-build = "econochart.data.build:main"
+econochart-clean-legacy = "econochart.data.cleanup_legacy:main"
+econochart-prepare-public = "econochart.data.public:main"
+econochart-validate = "econochart.data.validate:main"
+econochart-sft = "econochart.training.sft:main"
+econochart-grpo = "econochart.training.grpo:main"
+econochart-eval = "econochart.evaluation.runner:main"
+econochart-compare = "econochart.evaluation.compare:main"
+econochart-preflight = "econochart.preflight:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 119
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501", "B905"]

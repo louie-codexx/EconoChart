@@ -1,0 +1,66 @@
+experiment:
+  id: grpo_qlora_48g_domain_v1
+  hypothesis: Verifiable group-relative optimization improves numeric and trend correctness without degrading format or external ChartQA.
+
+seed: 20260821
+
+model:
+  name_or_path: Qwen/Qwen3-VL-4B-Instruct
+  adapter_path: null
+  dtype: bfloat16
+  min_pixels: 200704
+  max_pixels: 802816
+  gradient_checkpointing: true
+  quantization:
+    mode: 4bit
+    quant_type: nf4
+    compute_dtype: bfloat16
+    double_quant: true
+
+data:
+  train:
+    - path: data/generated/econochart_v2/annotations/grpo_train.jsonl
+      max_samples: 8000
+  eval:
+    - path: data/generated/econochart_v2/annotations/val.jsonl
+      max_samples: 256
+
+rewards:
+  names: [numeric, trend, format, evidence, risk, length]
+  weights: [0.35, 0.20, 0.15, 0.15, 0.10, 0.05]
+
+training:
+  output_dir: outputs/grpo_qlora_48g_domain_v1
+  num_train_epochs: 1
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 4
+  num_generations: 4
+  max_completion_length: 256
+  temperature: 0.8
+  top_p: 0.95
+  repetition_penalty: 1.05
+  learning_rate: 0.000005
+  beta: 0.001
+  epsilon: 0.2
+  loss_type: dr_grpo
+  scale_rewards: none
+  mask_truncated_completions: true
+  optim: paged_adamw_8bit
+  bf16: true
+  tf32: true
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs: {use_reentrant: false}
+  disable_dropout: true
+  use_vllm: false
+  eval_strategy: 'no'
+  save_strategy: steps
+  save_steps: 100
+  save_total_limit: 2
+  logging_steps: 5
+  log_completions: true
+  num_completions_to_print: 2
+  report_to: [tensorboard]
+  remove_unused_columns: false
+  dataloader_num_workers: 2
+  skip_memory_metrics: false

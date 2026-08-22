@@ -1,0 +1,9 @@
+extends: configs/train/sft_qlora_4090.yaml
+
+experiment:
+  id: sft_qlora_lr5e5_ablation
+  hypothesis: A lower adapter learning rate may preserve generic ChartQA ability at the cost of slower domain adaptation.
+
+training:
+  output_dir: outputs/sft_qlora_lr5e5_ablation
+  learning_rate: 0.00005

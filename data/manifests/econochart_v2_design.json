@@ -1,0 +1,33 @@
+{
+  "dataset": "econochart-v2.0",
+  "status": "design_target_not_full_build_result",
+  "builder_config": "configs/data/econochart_v2.yaml",
+  "seed": 20260821,
+  "split_unit": "entity_id",
+  "target": {
+    "companies": 3000,
+    "charts_per_company": 2,
+    "tasks_per_chart": 4,
+    "charts": 6000,
+    "records": 24000
+  },
+  "industries": 6,
+  "scenarios": 8,
+  "views": [
+    "financial",
+    "operations",
+    "growth",
+    "composition",
+    "dashboard"
+  ],
+  "tracked_sample": {
+    "root": "data/samples/econochart_v2",
+    "companies": 8,
+    "charts": 16,
+    "records": 64,
+    "validation_status": "passed",
+    "validation_issues": 0,
+    "manifest_sha256": "890d3dd8d9e8db317f2e2fca12f93f89b03ab9031866fcdc303553e820f2f0b2"
+  },
+  "full_build_rule": "Use the generated manifest.json as the authoritative counts and checksums after AutoDL build."
+}

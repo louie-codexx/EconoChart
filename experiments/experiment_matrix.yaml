@@ -1,0 +1,107 @@
+project: EconoChart
+base_model: Qwen/Qwen3-VL-4B-Instruct
+data_version: econochart-v2.0
+comparison_seed: 20260821
+
+rules:
+  - Freeze the test IDs and hashes before the base run.
+  - Change one primary factor per ablation.
+  - Never use ChartQA test or ChartQAPro for training, early stopping, or parameter selection.
+  - Report internal capability slices, external benchmarks, efficiency, and qualitative failures.
+  - Do not enter GRPO until the selected SFT adapter passes its evaluation gate.
+
+experiments:
+  - id: D0_sample_validation
+    stage: data
+    status: completed
+    config: configs/data/econochart_sample.yaml
+    hypothesis: The final data pipeline produces coherent, leak-free, fixed-size records and images.
+    evidence: data/samples/econochart_v2/validation_report.json
+    result: 8 entities, 16 charts, 64 records, zero validation issues.
+
+  - id: B0_base_internal_external
+    stage: baseline
+    status: code_ready
+    configs: [configs/eval/base_internal.yaml, configs/eval/base_external.yaml]
+    hypothesis: The base model's errors identify the true domain and reasoning gaps before adaptation.
+    primary_metrics: [overall, numeric, trend, relaxed_accuracy]
+    decision: Establish the fixed control for every later stage.
+
+  - id: S0_sft_smoke
+    stage: sft
+    status: code_ready
+    config: configs/train/sft_qlora_smoke.yaml
+    hypothesis: The final VLM data/model/QLoRA/collator/save-reload chain works on the target GPU.
+    primary_metrics: [finite_loss, peak_vram_gib, adapter_reload]
+    decision: Gate the full SFT run; not a capability experiment.
+
+  - id: S1_qlora_r16_domain
+    stage: sft
+    status: code_ready
+    config: configs/train/sft_qlora_4090.yaml
+    control: B0_base_internal_external
+    hypothesis: LLM-only QLoRA improves domain structure and verifiable reasoning on a 24GB GPU.
+    primary_metrics: [overall, numeric, trend, evidence, risk]
+    guardrails: [ChartQA, ChartQAPro, output_length, format]
+
+  - id: S2_rank_ablation
+    stage: sft_ablation
+    status: code_ready
+    configs:
+      - configs/train/sft_qlora_r8_ablation.yaml
+      - configs/train/sft_qlora_4090.yaml
+      - configs/train/sft_qlora_r32_ablation.yaml
+    single_factor: adapter rank (8/16/32), alpha fixed at 2r
+    decision: Select the smallest rank whose quality gain is supported by paired metrics.
+
+  - id: S3_learning_rate_ablation
+    stage: sft_ablation
+    status: code_ready
+    configs:
+      - configs/train/sft_qlora_lr5e5_ablation.yaml
+      - configs/train/sft_qlora_4090.yaml
+      - configs/train/sft_qlora_lr2e4_ablation.yaml
+    single_factor: learning rate (5e-5/1e-4/2e-4)
+    decision: Balance convergence, stability, and external capability retention.
+
+  - id: S4_quantization_ablation
+    stage: sft_ablation
+    status: code_ready
+    configs:
+      - configs/train/sft_qlora_4090.yaml
+      - configs/train/sft_lora_4090_ablation.yaml
+    single_factor: 4-bit QLoRA versus BF16 LoRA
+    decision: Quantify quality, memory, and throughput trade-offs.
+
+  - id: S5_public_mix_ablation
+    stage: sft_ablation
+    status: code_ready
+    configs:
+      - configs/train/sft_qlora_4090.yaml
+      - configs/train/sft_qlora_4090_mixed_chartqa.yaml
+    single_factor: add an 8k fixed-seed ChartQA training subset
+    decision: Test whether generic chart QA improves without diluting domain reasoning.
+
+  - id: R0_grpo_4090_smoke
+    stage: grpo
+    status: code_ready
+    config: configs/train/grpo_qlora_4090_smoke.yaml
+    prerequisite: selected and evaluated SFT adapter
+    hypothesis: Qwen3-VL VLM rollouts and all offline-tested rewards are compatible on 24GB.
+    primary_metrics: [finite_loss, reward_variance, peak_vram_gib, adapter_reload]
+
+  - id: R1_grpo_48g_full
+    stage: grpo
+    status: code_ready
+    config: configs/train/grpo_qlora_48g.yaml
+    prerequisite: R0 smoke and SFT-to-GRPO gate
+    hypothesis: Verifiable GRPO improves numeric and trend correctness without reward hacking or external regression.
+    primary_metrics: [overall, numeric, trend]
+    guardrails: [format, evidence, risk, ChartQA, ChartQAPro, output_length]
+
+  - id: R2_reward_ablation
+    stage: grpo_ablation
+    status: planned
+    variants: [all_rewards, no_format_or_length, no_numeric, no_trend]
+    prerequisite: R1 provides a measurable non-zero effect
+    decision: Attribute RL gains to capability rewards rather than surface structure.

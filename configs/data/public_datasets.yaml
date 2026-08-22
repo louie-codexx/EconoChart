@@ -1,0 +1,20 @@
+project:
+  seed: 20260821
+
+public:
+  chartqa:
+    dataset_id: HuggingFaceM4/ChartQA
+    output_root: data/generated/public/chartqa
+    # The default mixture uses an 8k deterministic training subset so the
+    # domain data remains the majority. Validation and test stay complete.
+    max_samples:
+      train: 8000
+      val: null
+      test: null
+
+  chartqapro:
+    dataset_id: ahmed-masry/ChartQAPro
+    output_root: data/generated/public/chartqapro
+    # Test-only benchmark. It must never be added to an SFT or GRPO mixture.
+    max_samples:
+      test: null

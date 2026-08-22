@@ -1,0 +1,9 @@
+extends: configs/train/sft_qlora_4090.yaml
+
+experiment:
+  id: sft_qlora_lr2e4_ablation
+  hypothesis: A higher adapter learning rate may converge faster but risks instability or generic capability regression.
+
+training:
+  output_dir: outputs/sft_qlora_lr2e4_ablation
+  learning_rate: 0.0002

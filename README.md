@@ -1,136 +1,166 @@
 # EconoChart
 
-## 面向数字经济经营分析的多模态图表推理模型
+基于 [Qwen3-VL-4B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct) 的数字经济经营分析多模态后训练项目。
 
-EconoChart is a multimodal chart reasoning model designed for digital economy analysis scenarios.
+EconoChart 不把“跑一次 LoRA”当作项目结论，而是建立一条可审计的实验链：无泄漏数据 → base 基线 → LoRA/QLoRA SFT → 分能力评测与消融 → 可验证 GRPO → 失败复盘。目标能力包括图表理解、数值推理、经营风险诊断和证据约束的决策建议。
 
-本项目旨在构建一个能够理解经营分析图表，并结合业务问题进行推理分析的多模态大模型。
+> 当前状态：数据、训练、奖励、评测、预检和 CPU 测试代码已实现；仓库内 8 家企业/16 张图/64 条问答样例通过完整校验。GPU 基线、SFT 与 GRPO 结果必须在 AutoDL 实际运行后填写，仓库不会预先声称未经验证的提升。
 
-输入：
+## 为什么这个项目不是普通微调 Demo
 
-- 企业经营数据图表
-- 用户分析问题
+- 企业级切分：先按企业划分 train/val/test，再派生多视图和多问题，避免同图或同企业泄漏。
+- 可验证监督：回答使用【结论】【数据依据】【风险】【建议】，不监督不可审计的自由式隐藏思维链。
+- 业务一致性：收入由用户与 ARPU 推导，利润满足收入减成本，并保留利润率、转化率、CAC、产品和区域结构。
+- 无标签捷径：图表不显示经营 scenario，固定尺寸渲染，财务指标和用户指标不再错误共轴。
+- 统一对比：base、SFT、GRPO 使用相同测试记录、确定性解码和同一套分能力指标。
+- 真正的 RL 问题：GRPO 只训练存在确定 ground truth 的数值、趋势、证据和风险任务，reward 可离线单测。
+- 可归因实验：LoRA rank、学习率、量化方式、公开数据混合和 reward 组合均有独立假设与消融计划。
 
-输出：
+## 实验链路
 
-- 图表信息理解
-- 数据趋势分析
-- 业务原因解释
-- 经营决策辅助建议
+```mermaid
+flowchart LR
+    A[确定性业务数据] --> B[无泄漏多视图图表]
+    B --> C[数据质检与固定测试集]
+    C --> D[Base 内部/外部基线]
+    D --> E[QLoRA/LoRA SFT]
+    E --> F[成对评测与消融]
+    F -->|通过阶段门槛| G[可验证 GRPO]
+    G --> H[最终评测与实验复盘]
+```
 
+LoRA/QLoRA 是 SFT 的参数更新方式，不是“先全参数 SFT、再 LoRA”的两个必经阶段。单卡 RTX 4090 24GB 默认使用 QLoRA；BF16 LoRA 是方法消融，全参数训练只保留接口，不作为 4090 默认方案。
 
----
+## 数据体系
 
-# 1. 项目背景
+| 数据 | 用途 | 是否训练 | 仓库是否保存全量 |
+|---|---|---:|---:|
+| EconoChart-v2 | 数字经济经营分析主数据 | 是 | 否，可确定性重建 |
+| ChartQA train/val | 通用图表 QA 混合消融 | 可选 | 否，按官方来源准备 |
+| ChartQA test | 外部分布基准 | 否 | 否 |
+| ChartQAPro test | 高难真实图表挑战集 | 否 | 否 |
+| `data/samples/econochart_v2` | 代码测试与 GitHub 展示 | 否 | 是 |
 
-随着数字经济的发展，企业经营分析越来越依赖数据可视化报告。
+默认 v2 配置生成 3,000 家企业、6,000 张图、24,000 条任务对齐问答；实际数量、分布和校验哈希以每次构建生成的 `manifest.json` 为准。公开数据的许可和用途见 [数据卡](docs/data_card.md)。
 
-传统的数据分析流程通常需要人工阅读大量图表，并结合业务经验进行分析。
+## AutoDL 最短可信闭环
 
-本项目希望探索：
+以下命令在仓库根目录执行。基础模型不进入 Git，通过环境变量指向 AutoDL 已下载目录。
 
-> 多模态大语言模型是否能够理解经营分析场景中的图表信息，并完成类似分析师的推理任务。
+```bash
+git pull origin main
+python -m pip install -e ".[train,dev]"
 
+export ECONOCHART_MODEL_PATH=/root/autodl-tmp/models/Qwen3-VL-4B-Instruct
 
----
+econochart-preflight --stage data --config configs/data/econochart_v2.yaml \
+  --report outputs/preflight/data.json
+econochart-build --config configs/data/econochart_v2.yaml
+econochart-validate --dataset-root data/generated/econochart_v2 --full-image-scan
 
-# 2. 项目目标
+econochart-preflight --stage eval --config configs/eval/base_internal.yaml \
+  --report outputs/preflight/base_eval.json
+econochart-eval --config configs/eval/base_internal.yaml
 
-构建一个面向数字经济场景的多模态图表推理模型，实现：
+econochart-preflight --stage sft --config configs/train/sft_qlora_smoke.yaml \
+  --report outputs/preflight/sft_smoke.json
+econochart-sft --config configs/train/sft_qlora_smoke.yaml
 
-- 图表内容理解
-- 数据趋势分析
-- 业务逻辑推理
-- 分析报告生成
+econochart-sft --config configs/train/sft_qlora_4090.yaml
+export ECONOCHART_ADAPTER_PATH=outputs/sft_qlora_r16_domain_v1/final_adapter
 
+econochart-eval --config configs/eval/base_internal.yaml \
+  --adapter "$ECONOCHART_ADAPTER_PATH" \
+  --output-dir outputs/evaluation/sft_internal_v1
 
----
+econochart-preflight --stage grpo --config configs/train/grpo_qlora_4090_smoke.yaml \
+  --report outputs/preflight/grpo_smoke.json
+econochart-grpo --config configs/train/grpo_qlora_4090_smoke.yaml
+```
 
-# 3. 技术路线
+不要从数据构建直接跳到 GRPO。必须先保存 base 预测、完成 SFT smoke、评测 SFT adapter，并确认数值/趋势提升没有以格式或外部泛化显著退化为代价。完整执行顺序、环境检查和 OOM 处理见 [AutoDL 手册](docs/autodl_runbook.md)。
 
-整体流程：
-数据构造
-    |
-    |
-图表-问题-答案数据集
-    |
-    |
-Vision Language Model
-视觉语言模型
-(Qwen3-VL)
-    |
-    |
-Supervised Fine-Tuning
-监督微调
-(SFT)
-    |
-    |
-Reinforcement Learning
-强化学习
-(RL)
-    |
-    |
-EconoChart Model
+## 公开基准（可选准备）
 
----
+```bash
+econochart-prepare-public --config configs/data/public_datasets.yaml --dataset chartqa
+econochart-prepare-public --config configs/data/public_datasets.yaml --dataset chartqapro
+econochart-eval --config configs/eval/base_external.yaml
+```
 
-# 4. 项目结构
-EconoChart/
-├── data/
-│   ├── raw/
-│   └── processed/
-├── src/
-│   ├── data/
-│   ├── models/
-│   ├── train/
-│   ├── evaluation/
-│   └── utils/
-├── configs/
-├── scripts/
-├── experiments/
-└── checkpoints/
+ChartQAPro 只用于最终测试。评测会额外生成 `chartqapro_official_predictions.json`，可再交给官方脚本或 VLMEvalKit 复核。
 
----
+## 公平比较
 
-# 5. 当前进度
+```bash
+econochart-compare \
+  --baseline outputs/evaluation/base_internal_v1/predictions.jsonl \
+  --candidate outputs/evaluation/sft_internal_v1/predictions.jsonl \
+  --output outputs/evaluation/base_vs_sft.json
+```
 
-## Phase 0 环境准备
+比较器严格对齐样本 ID 和 reference 字段，并用成对 bootstrap 输出 95% 置信区间。总体均值之外，还按任务、视图、行业、难度和经营场景切片，回答“哪些能力真的改善、哪些没有”。
 
-✅ 项目初始化
+长时间评测会定期保存预测；同一模型与配置中断后可加 `--resume`。续跑会核对原 run manifest、确定性样本前缀和 reference，拒绝把不同运行结果拼接在一起。
 
-✅ Git版本控制
+## 4090 默认设计
 
-✅ GitHub仓库建立
+| 参数 | 默认值 | 初始依据 |
+|---|---:|---|
+| SFT 方法 | 4-bit NF4 QLoRA | 24GB 显存下保留训练余量 |
+| LoRA target | LLM attention + MLP projections | 默认冻结视觉塔和投影层，先隔离语言/推理适配效果 |
+| rank / alpha | 16 / 32 | 容量与成本折中；另测 r=8、32 |
+| 有效 batch | 16 | 单卡 batch=1、累积 16，稳定 adapter 更新 |
+| SFT LR | `1e-4` | adapter 常用起点；另测 `5e-5`、`2e-4` |
+| 视觉 token 上限 | 1024 | 图表可读性与显存的主要折中旋钮 |
+| GRPO smoke | 2 generations、beta=0 | 4090 先验证完整链路，关闭 KL/reference-policy 路径以降低开销 |
+| 正式 GRPO | 4 generations、beta=0.001 | 高显存配置再验证相对奖励与 KL 约束 |
 
+这些值是实验起点，不是事后包装的“最优参数”。最终选择必须引用显存、吞吐、验证集和外部基准结果。详细理由与降级顺序见 [实验协议](docs/experiment_protocol.md)。
 
-## Phase 1 项目架构设计
+## 项目结构
 
-🚧 数据构造方案设计
+```text
+configs/                 数据、SFT、GRPO、评测与消融配置
+data/
+  manifests/             可跟踪的数据设计清单
+  samples/               可跟踪的小型完整样例
+docs/                    架构、数据卡、AutoDL、实验与面试材料
+experiments/             实验矩阵、记录模板和聚合结果
+src/econochart/
+  data/                  生成、公开数据适配、schema、训练视图、质检
+  models/                Qwen3-VL/量化/adapter 加载
+  training/              SFT 与 GRPO
+  rewards/               可单测 reward 组件
+  evaluation/            推理、指标、成对比较
+  preflight.py           AutoDL 环境与运行前检查
+tests/                   不下载模型的 CPU 测试
+```
 
-🚧 模型选择
+## 测试
 
+```bash
+python -m pytest
+python -m ruff check .
+```
 
----
+本地 CPU 测试不会证明 Qwen3-VL 与 TRL 在目标 GPU 上一定兼容，因此 SFT 和 GRPO 都有使用最终代码路径的 AutoDL smoke gate。
 
-# 6. 计划
+## GitHub 与训练产物边界
 
-后续将完成：
+主仓库提交代码、配置、测试、文档、轻量样例、manifest 和聚合实验结论；不提交完整数据、基础模型、adapter/checkpoint、optimizer state、原始日志、预测大文件或 `.env`。最终 adapter 可发布到 Hugging Face/ModelScope/Release，并在实验记录中注明基座和许可。
 
-- 构建数字经济经营分析图表数据集
-- 基于Qwen3-VL进行模型训练
-- 完成SFT监督微调
-- 使用强化学习优化模型推理能力
-- 建立评测体系
-- 完成Demo展示
+详见 [数据目录说明](data/README.md) 与 [实验记录规范](experiments/README.md)。
 
+## 文档导航
 
----
+- [系统架构](docs/architecture.md)
+- [数据卡与公开数据许可](docs/data_card.md)
+- [AutoDL 分阶段运行手册](docs/autodl_runbook.md)
+- [实验、消融、阶段门槛与停止条件](docs/experiment_protocol.md)
+- [环境兼容与预检](docs/environment.md)
+- [算法面试讲解与追问](docs/interview_guide.md)
 
-# 7. Future Work
+## License
 
-未来将进一步探索：
-
-- 更复杂的商业分析任务
-- 多轮分析能力
-- 工具调用能力
-- 自动生成经营分析报告
+项目代码采用 Apache-2.0。基础模型与公开数据分别遵循其原始许可；本仓库不重新分发它们。

@@ -1,0 +1,16 @@
+{
+  "train": [
+    "ec_company_000001",
+    "ec_company_000002",
+    "ec_company_000003",
+    "ec_company_000004",
+    "ec_company_000005",
+    "ec_company_000006"
+  ],
+  "val": [
+    "ec_company_000007"
+  ],
+  "test": [
+    "ec_company_000008"
+  ]
+}

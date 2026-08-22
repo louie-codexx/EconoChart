@@ -1,0 +1,12 @@
+extends: configs/train/sft_qlora_4090.yaml
+
+experiment:
+  id: sft_qlora_r32_ablation
+  hypothesis: Rank 32 may help harder reasoning slices, but can overfit templates and costs more memory.
+
+adapter:
+  r: 32
+  alpha: 64
+
+training:
+  output_dir: outputs/sft_qlora_r32_ablation

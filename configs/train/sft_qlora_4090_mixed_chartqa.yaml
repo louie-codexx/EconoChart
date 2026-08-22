@@ -1,0 +1,17 @@
+extends: configs/train/sft_qlora_4090.yaml
+
+experiment:
+  id: sft_qlora_r16_domain_chartqa_v1
+  hypothesis: A bounded ChartQA mixture improves external chart QA without diluting domain business reasoning.
+
+data:
+  train:
+    - path: data/generated/econochart_v2/annotations/train.jsonl
+    - path: data/generated/public/chartqa/annotations/train.jsonl
+      max_samples: 8000
+  eval:
+    - path: data/generated/econochart_v2/annotations/val.jsonl
+      max_samples: 512
+
+training:
+  output_dir: outputs/sft_qlora_r16_domain_chartqa_v1
