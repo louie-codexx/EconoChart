@@ -4,6 +4,12 @@ experiment:
   id: sft_qlora_lr2e4_ablation
   hypothesis: A higher adapter learning rate may converge faster but risks instability or generic capability regression.
 
+data:
+  train:
+    - path: data/generated/econochart_v2/subsets/sft_screen_4800.jsonl
+      expected_rows: 4800
+
 training:
-  output_dir: outputs/sft_qlora_lr2e4_ablation
+  output_dir: outputs/screen/sft_qlora_r16_lr2e4
+  num_train_epochs: 1
   learning_rate: 0.0002

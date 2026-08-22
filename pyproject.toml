@@ -45,6 +45,7 @@ dev = [
 
 [project.scripts]
 econochart-build = "econochart.data.build:main"
+econochart-build-subsets = "econochart.data.subsets:main"
 econochart-clean-legacy = "econochart.data.cleanup_legacy:main"
 econochart-prepare-public = "econochart.data.public:main"
 econochart-validate = "econochart.data.validate:main"

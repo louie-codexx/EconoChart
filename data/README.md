@@ -9,6 +9,7 @@ data/
 ├── samples/econochart_v2/      tracked 8-entity integration sample
 └── generated/                  ignored full data built on AutoDL
     ├── econochart_v2/
+    │   └── subsets/            ignored frozen SFT/GRPO/validation budgets
     └── public/
         ├── chartqa/
         └── chartqapro/
@@ -19,7 +20,14 @@ Build the full domain dataset:
 ```bash
 econochart-build --config configs/data/econochart_v2.yaml
 econochart-validate --dataset-root data/generated/econochart_v2 --full-image-scan
+econochart-build-subsets --config configs/data/training_subsets.yaml
 ```
+
+The subset builder verifies the frozen full-dataset manifest hash and writes a
+checksum-bearing `subset_manifest.json`. It selects by entity/chart coverage and
+task quotas; it never truncates the first N JSONL rows. The 512-row development
+panel is sampled from `val`, while the complete 2,496-row `test` split remains
+unchanged for milestone evaluation.
 
 Prepare public data from official sources:
 

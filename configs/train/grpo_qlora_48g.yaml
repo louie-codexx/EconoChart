@@ -19,11 +19,11 @@ model:
 
 data:
   train:
-    - path: data/generated/econochart_v2/annotations/grpo_train.jsonl
-      max_samples: 8000
+    - path: data/generated/econochart_v2/subsets/grpo_train_3600.jsonl
+      expected_rows: 3600
   eval:
-    - path: data/generated/econochart_v2/annotations/val.jsonl
-      max_samples: 256
+    - path: data/generated/econochart_v2/subsets/val_512.jsonl
+      expected_rows: 512
 
 rewards:
   names: [numeric, trend, format, evidence, risk, length]

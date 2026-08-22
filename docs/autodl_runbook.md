@@ -50,6 +50,9 @@ econochart-build --config configs/data/econochart_v2.yaml
 econochart-validate \
   --dataset-root data/generated/econochart_v2 \
   --full-image-scan
+
+econochart-build-subsets \
+  --config configs/data/training_subsets.yaml
 ```
 
 验收：
@@ -58,6 +61,8 @@ econochart-validate \
 - 企业、chart、image 跨 split 交集为 0；
 - 目标规模约 3,000 企业、6,000 图、24,000 问答；
 - `manifest.json`、split entity 清单和 annotation 哈希已生成；
+- `subsets/subset_manifest.json` 的源 manifest 哈希匹配，SFT screen/final、GRPO、val 分别为 4,800/9,600/3,600/512 条；
+- SFT final 覆盖全部 2,400 家 train 企业和 4,800 张图，GRPO 覆盖全部 train 企业，development 子集没有 test 行；
 - 人工抽查至少 50 张图，确认标签、刻度、图例和单位可读且无 scenario 泄漏。
 
 首次构建后不要在同一实验系列中重新生成 test。如果要更换生成逻辑，必须提高数据版本并重跑 base。
@@ -117,7 +122,32 @@ smoke 只回答工程问题，不用于报告模型效果：
 
 任何一项失败都先修 smoke，不能直接启动全量训练。
 
-## 6. 主 SFT 与断点续训
+## 6. 参数筛选、主 SFT 与断点续训
+
+先在固定的 4,800 条嵌套筛选集上各跑 1 epoch。只比较四个能改变决策的候选；r=32、BF16 LoRA 和 ChartQA 混合由错误分析触发，不默认执行：
+
+```bash
+econochart-sft --config configs/train/sft_qlora_r8_ablation.yaml
+econochart-sft --config configs/train/sft_qlora_r16_screen.yaml
+econochart-sft --config configs/train/sft_qlora_lr5e5_ablation.yaml
+econochart-sft --config configs/train/sft_qlora_lr2e4_ablation.yaml
+```
+
+每个候选都用同一个 512 条 val 面板做确定性生成评测。下面以 r16/lr1e-4 为例，其他候选替换 adapter 和输出目录：
+
+```bash
+econochart-preflight --stage eval \
+  --config configs/eval/development_val_512.yaml \
+  --adapter outputs/screen/sft_qlora_r16_lr1e4/final_adapter \
+  --report outputs/preflight/sft_r16_lr1e4_val512.json
+
+econochart-eval \
+  --config configs/eval/development_val_512.yaml \
+  --adapter outputs/screen/sft_qlora_r16_lr1e4/final_adapter \
+  --output-dir outputs/evaluation/screen_r16_lr1e4_val512
+```
+
+根据 val 指标、峰值显存、吞吐、稳定性和错误切片选择参数；此时不要查看完整 test。若胜出者不是中心候选，先把选择结果及理由写入私有记录，并把正式配置的 rank/alpha/LR 更新为胜出值。然后运行 9,600 条、2 epochs 的主 SFT：
 
 ```bash
 econochart-sft --config configs/train/sft_qlora_4090.yaml
@@ -179,20 +209,18 @@ econochart-compare \
 
 若不满足，先做 SFT 数据、rank、LR 或公开数据混合消融，不能用 GRPO 掩盖不稳定 SFT。
 
-## 8. SFT 消融
+## 8. 条件 SFT 消融
 
 每次只改变一个主要因素，并从相同 base、相同数据版本、相同 seed 和相同测试集出发：
 
+默认筛选只运行第 6 节的四个候选。只有 r=16 显示容量不足时才跑 r=32；只有量化误差成为可信解释时才跑 BF16 LoRA；只有正式 SFT 外部 ChartQA 明显退化时才准备并运行 ChartQA 混合。不要为了矩阵完整而运行没有决策价值的组合。
+
 ```bash
-econochart-sft --config configs/train/sft_qlora_r8_ablation.yaml
+# 条件执行，不是默认清单
 econochart-sft --config configs/train/sft_qlora_r32_ablation.yaml
-econochart-sft --config configs/train/sft_qlora_lr5e5_ablation.yaml
-econochart-sft --config configs/train/sft_qlora_lr2e4_ablation.yaml
 econochart-sft --config configs/train/sft_lora_4090_ablation.yaml
 econochart-sft --config configs/train/sft_qlora_4090_mixed_chartqa.yaml
 ```
-
-算力有限时优先级：r=8/16/32 → LR → 公开数据混合 → BF16 LoRA。不要为了矩阵完整而运行没有决策价值的组合。
 
 ## 9. GRPO smoke
 
@@ -210,7 +238,7 @@ econochart-grpo --config configs/train/grpo_qlora_4090_smoke.yaml
 
 ## 10. 正式 GRPO 与最终评测
 
-48GB 配置不是强制要求，而是当前正式实验起点：
+48GB 配置不是强制要求，而是当前正式实验起点。数据预算固定为 3,600 prompts × 4 generations（14,400 rollouts），不能用随手截断替代覆盖率约束子集：
 
 ```bash
 econochart-preflight --stage grpo \

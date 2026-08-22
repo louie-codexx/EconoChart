@@ -6,6 +6,8 @@ comparison_seed: 20260821
 rules:
   - Freeze the test IDs and hashes before the base run.
   - Change one primary factor per ablation.
+  - Select SFT hyperparameters only on the fixed 512-row validation panel.
+  - Reserve the complete 2,496-row internal test for Base and selected milestone checkpoints.
   - Never use ChartQA test or ChartQAPro for training, early stopping, or parameter selection.
   - Report internal capability slices, external benchmarks, efficiency, and qualitative failures.
   - Do not enter GRPO until the selected SFT adapter passes its evaluation gate.
@@ -18,6 +20,14 @@ experiments:
     hypothesis: The final data pipeline produces coherent, leak-free, fixed-size records and images.
     evidence: data/samples/econochart_v2/validation_report.json
     result: 8 entities, 16 charts, 64 records, zero validation issues.
+
+  - id: D1_frozen_training_subsets
+    stage: data
+    status: code_ready
+    config: configs/data/training_subsets.yaml
+    hypothesis: Entity- and chart-aware reduction preserves coverage while removing redundant questions and rollout cost.
+    outputs: [sft_screen_4800, sft_train_9600, grpo_train_3600, val_512]
+    decision: Freeze subset hashes before parameter screening or formal training.
 
   - id: B0_base_internal_external
     stage: baseline
@@ -41,6 +51,7 @@ experiments:
     config: configs/train/sft_qlora_4090.yaml
     control: B0_base_internal_external
     hypothesis: LLM-only QLoRA improves domain structure and verifiable reasoning on a 24GB GPU.
+    data_budget: 9,600 rows x 2 epochs; all 2,400 train entities and 4,800 charts retained.
     primary_metrics: [overall, numeric, trend, evidence, risk]
     guardrails: [ChartQA, ChartQAPro, output_length, format]
 
@@ -49,9 +60,10 @@ experiments:
     status: code_ready
     configs:
       - configs/train/sft_qlora_r8_ablation.yaml
-      - configs/train/sft_qlora_4090.yaml
-      - configs/train/sft_qlora_r32_ablation.yaml
-    single_factor: adapter rank (8/16/32), alpha fixed at 2r
+      - configs/train/sft_qlora_r16_screen.yaml
+    conditional_configs: [configs/train/sft_qlora_r32_ablation.yaml]
+    data_budget: 4,800 rows x 1 epoch; compare on the same val_512 IDs.
+    single_factor: adapter rank (8/16; run 32 only if 16 is capacity-limited), alpha fixed at 2r
     decision: Select the smallest rank whose quality gain is supported by paired metrics.
 
   - id: S3_learning_rate_ablation
@@ -59,27 +71,28 @@ experiments:
     status: code_ready
     configs:
       - configs/train/sft_qlora_lr5e5_ablation.yaml
-      - configs/train/sft_qlora_4090.yaml
+      - configs/train/sft_qlora_r16_screen.yaml
       - configs/train/sft_qlora_lr2e4_ablation.yaml
+    data_budget: 4,800 rows x 1 epoch; compare on the same val_512 IDs.
     single_factor: learning rate (5e-5/1e-4/2e-4)
     decision: Balance convergence, stability, and external capability retention.
 
   - id: S4_quantization_ablation
     stage: sft_ablation
-    status: code_ready
+    status: conditional
     configs:
-      - configs/train/sft_qlora_4090.yaml
+      - configs/train/sft_qlora_r16_screen.yaml
       - configs/train/sft_lora_4090_ablation.yaml
     single_factor: 4-bit QLoRA versus BF16 LoRA
     decision: Quantify quality, memory, and throughput trade-offs.
 
   - id: S5_public_mix_ablation
     stage: sft_ablation
-    status: code_ready
+    status: conditional
     configs:
       - configs/train/sft_qlora_4090.yaml
       - configs/train/sft_qlora_4090_mixed_chartqa.yaml
-    single_factor: add an 8k fixed-seed ChartQA training subset
+    single_factor: add a 3,200-row fixed-seed ChartQA subset to 9,600 domain rows
     decision: Test whether generic chart QA improves without diluting domain reasoning.
 
   - id: R0_grpo_4090_smoke
@@ -96,6 +109,7 @@ experiments:
     config: configs/train/grpo_qlora_48g.yaml
     prerequisite: R0 smoke and SFT-to-GRPO gate
     hypothesis: Verifiable GRPO improves numeric and trend correctness without reward hacking or external regression.
+    data_budget: 3,600 prompts x 4 generations = 14,400 rollouts; every train entity appears at least once.
     primary_metrics: [overall, numeric, trend]
     guardrails: [format, evidence, risk, ChartQA, ChartQAPro, output_length]
 

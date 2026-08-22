@@ -1,6 +1,6 @@
 experiment:
-  id: base_internal_v1
-  checkpoint_stage: base
+  id: development_val_512_v1
+  checkpoint_stage: development
 
 seed: 20260821
 
@@ -18,8 +18,8 @@ model:
 
 data:
   test:
-    - path: data/generated/econochart_v2/annotations/test.jsonl
-      expected_rows: 2496
+    - path: data/generated/econochart_v2/subsets/val_512.jsonl
+      expected_rows: 512
 
 generation:
   max_new_tokens: 320
@@ -27,6 +27,8 @@ generation:
   repetition_penalty: 1.0
 
 evaluation:
+  # This file intentionally evaluates validation rows. It must never point at test.
+  expected_split: val
   save_every: 25
   reward_weights:
     numeric: 0.35
@@ -37,4 +39,4 @@ evaluation:
     length: 0.05
 
 training:
-  output_dir: outputs/evaluation/base_internal_v1
+  output_dir: outputs/evaluation/development_val_512_v1

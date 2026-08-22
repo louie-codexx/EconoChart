@@ -4,9 +4,15 @@ experiment:
   id: sft_qlora_r8_ablation
   hypothesis: Rank 8 may match rank 16 with fewer trainable parameters; compare quality and throughput.
 
+data:
+  train:
+    - path: data/generated/econochart_v2/subsets/sft_screen_4800.jsonl
+      expected_rows: 4800
+
 adapter:
   r: 8
   alpha: 16
 
 training:
-  output_dir: outputs/sft_qlora_r8_ablation
+  output_dir: outputs/screen/sft_qlora_r8_lr1e4
+  num_train_epochs: 1

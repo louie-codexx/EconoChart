@@ -69,6 +69,20 @@ Region shares ≈ 100%
 - 每图任务粒度、问答复用和答案多样性；
 - annotation 与 raw 文件哈希。
 
+## 训练预算子集
+
+完整标注保留为数据母集，正式实验不通过“取 JSONL 前 N 条”降本。固定子集构建器使用种子 `20260821` 和完整数据 manifest 哈希，生成：
+
+| 子集 | 规模 | 覆盖约束 | 用途 |
+|---|---:|---|---|
+| SFT screen | 4,800 | 每张 train 图 1 题，覆盖 2,400 家企业/4,800 张图 | rank/LR 筛选，1 epoch |
+| SFT final | 9,600 | 每张 train 图 2 题，screen 嵌套其中 | 正式 SFT，2 epochs |
+| GRPO | 3,600 prompts | 3,600 张不同 train 图，全部 2,400 家企业至少出现 1 次 | 4 generations，共 14,400 rollouts |
+| development | 512 | 仅从 val 按任务及业务切片分层抽样 | 中间选参与错误分析 |
+| internal test | 2,496 | 完整 test，不参与训练、早停或选参 | Base 与最终里程碑完整评测 |
+
+SFT 优先保留全部图片和企业覆盖、减少同一图的重复问题；GRPO 使用显式任务配额，避免低成本的简单读取任务主导昂贵 rollout。所有子集的源文件哈希、结果哈希、任务/视图/行业/难度/场景分布和覆盖不变量写入 `subsets/subset_manifest.json`。
+
 ## 公开数据角色与许可
 
 | 数据集 | 许可 | 本项目角色 | 污染规则 |
@@ -97,6 +111,7 @@ Region shares ≈ 100%
 ```bash
 econochart-build --config configs/data/econochart_v2.yaml
 econochart-validate --dataset-root data/generated/econochart_v2 --full-image-scan
+econochart-build-subsets --config configs/data/training_subsets.yaml
 ```
 
 不使用 `--overwrite` 时，构建器拒绝覆盖非空目录；需要重建时必须显式传入该参数。

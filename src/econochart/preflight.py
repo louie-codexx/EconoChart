@@ -271,9 +271,23 @@ def _data_checks(report: Report, stage: str, config: dict[str, Any]) -> None:
             errors = []
             for row in rows[: min(25, len(rows))]:
                 errors.extend(validate_record(row))
-            wrong_split = sum(row.get("split") != ("val" if group == "eval" else group) for row in rows)
+            if stage == "eval" and group == "test":
+                expected_split = str(config.get("evaluation", {}).get("expected_split", "test"))
+            else:
+                expected_split = "val" if group == "eval" else group
+            wrong_split = sum(row.get("split") != expected_split for row in rows)
             source_summary.update({"rows": len(rows), "sample_schema_errors": errors[:5], "wrong_split_rows": wrong_split})
-            group_rows += min(len(rows), int(source.get("max_samples", len(rows))))
+            effective_rows = min(len(rows), int(source.get("max_samples", len(rows))))
+            expected_rows = source.get("expected_rows")
+            source_summary.update({"effective_rows": effective_rows, "expected_rows": expected_rows})
+            group_rows += effective_rows
+            if expected_rows is not None and effective_rows != int(expected_rows):
+                report.issue(
+                    "critical",
+                    "data",
+                    f"Source {path} expected {int(expected_rows)} effective rows, found {effective_rows}.",
+                    "Rebuild the frozen training subsets before launching this run.",
+                )
             if errors or wrong_split:
                 report.issue(
                     "critical",

@@ -6,12 +6,14 @@ experiment:
 
 data:
   train:
-    - path: data/generated/econochart_v2/annotations/train.jsonl
+    - path: data/generated/econochart_v2/subsets/sft_train_9600.jsonl
+      expected_rows: 9600
     - path: data/generated/public/chartqa/annotations/train.jsonl
-      max_samples: 8000
+      max_samples: 3200
+      expected_rows: 3200
   eval:
-    - path: data/generated/econochart_v2/annotations/val.jsonl
-      max_samples: 512
+    - path: data/generated/econochart_v2/subsets/val_512.jsonl
+      expected_rows: 512
 
 training:
   output_dir: outputs/sft_qlora_r16_domain_chartqa_v1

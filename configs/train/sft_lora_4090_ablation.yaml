@@ -24,14 +24,15 @@ adapter:
 
 data:
   train:
-    - path: data/generated/econochart_v2/annotations/train.jsonl
+    - path: data/generated/econochart_v2/subsets/sft_screen_4800.jsonl
+      expected_rows: 4800
   eval:
-    - path: data/generated/econochart_v2/annotations/val.jsonl
-      max_samples: 512
+    - path: data/generated/econochart_v2/subsets/val_512.jsonl
+      expected_rows: 512
 
 training:
-  output_dir: outputs/sft_lora_r16_domain_ablation
-  num_train_epochs: 2
+  output_dir: outputs/conditional/sft_lora_r16_screen
+  num_train_epochs: 1
   per_device_train_batch_size: 1
   per_device_eval_batch_size: 1
   gradient_accumulation_steps: 16

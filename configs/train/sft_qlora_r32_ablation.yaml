@@ -4,9 +4,15 @@ experiment:
   id: sft_qlora_r32_ablation
   hypothesis: Rank 32 may help harder reasoning slices, but can overfit templates and costs more memory.
 
+data:
+  train:
+    - path: data/generated/econochart_v2/subsets/sft_screen_4800.jsonl
+      expected_rows: 4800
+
 adapter:
   r: 32
   alpha: 64
 
 training:
-  output_dir: outputs/sft_qlora_r32_ablation
+  output_dir: outputs/conditional/sft_qlora_r32_screen
+  num_train_epochs: 1

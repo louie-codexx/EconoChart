@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from econochart.config import ConfigError, load_config
+from econochart.evaluation.runner import _load_eval_records
 from econochart.models.loading import trainable_parameter_summary
 from econochart.training.common import validate_grpo_batch
 
@@ -76,6 +77,30 @@ class TrainingConfigTests(unittest.TestCase):
         self.assertEqual(config["adapter"]["target_modules"][0], "q_proj")
         self.assertEqual(config["model"]["quantization"]["mode"], "4bit")
         self.assertEqual(config["training"]["learning_rate"], 0.0001)
+
+    def test_development_evaluation_explicitly_accepts_validation_split(self) -> None:
+        config = {
+            "seed": 20260821,
+            "data": {
+                "test": [
+                    {
+                        "path": "data/samples/econochart_v2/annotations/val.jsonl",
+                        "expected_rows": 8,
+                    }
+                ]
+            },
+            "evaluation": {"expected_split": "val"},
+        }
+        records = _load_eval_records(config)
+        self.assertEqual(len(records), 8)
+        self.assertTrue(all(row["split"] == "val" for row in records))
+
+    def test_formal_and_development_configs_freeze_their_row_counts(self) -> None:
+        formal = load_config("configs/eval/base_internal.yaml")
+        development = load_config("configs/eval/development_val_512.yaml")
+        self.assertEqual(formal["data"]["test"][0]["expected_rows"], 2496)
+        self.assertEqual(development["evaluation"]["expected_split"], "val")
+        self.assertEqual(development["data"]["test"][0]["expected_rows"], 512)
 
 
 if __name__ == "__main__":

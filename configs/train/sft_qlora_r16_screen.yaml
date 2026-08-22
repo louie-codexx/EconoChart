@@ -1,0 +1,14 @@
+extends: configs/train/sft_qlora_4090.yaml
+
+experiment:
+  id: sft_qlora_r16_lr1e4_screen
+  hypothesis: Rank 16 with learning rate 1e-4 is the central screening candidate.
+
+data:
+  train:
+    - path: data/generated/econochart_v2/subsets/sft_screen_4800.jsonl
+      expected_rows: 4800
+
+training:
+  output_dir: outputs/screen/sft_qlora_r16_lr1e4
+  num_train_epochs: 1

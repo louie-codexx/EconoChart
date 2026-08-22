@@ -17,7 +17,10 @@ from econochart.training.common import resolve_output_dir, save_run_snapshot, se
 def _load_eval_records(config: dict[str, Any]) -> list[dict[str, Any]]:
     seed = int(config.get("seed", 20260821))
     sources = config.get("data", {}).get("test", [])
-    records = load_record_sources(sources, expected_split="test", seed=seed) if sources else []
+    expected_split = str(config.get("evaluation", {}).get("expected_split", "test"))
+    if expected_split not in {"val", "test"}:
+        raise ValueError(f"evaluation.expected_split must be val or test, got {expected_split!r}")
+    records = load_record_sources(sources, expected_split=expected_split, seed=seed) if sources else []
     if not records:
         raise ValueError("No evaluation records configured under data.test")
     return records

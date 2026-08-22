@@ -65,6 +65,12 @@ def load_record_sources(
             seed,
             namespace=f"source:{source_index}:{path.as_posix()}",
         )
+        expected_rows = source.get("expected_rows")
+        if expected_rows is not None and len(records) != int(expected_rows):
+            raise ValueError(
+                f"Source {path} expected {int(expected_rows)} effective rows, found {len(records)}. "
+                "Rebuild the frozen training subsets before launching this run."
+            )
         repeat = int(source.get("repeat", 1))
         if repeat < 1:
             raise ValueError(f"repeat must be >=1 for source {path}")

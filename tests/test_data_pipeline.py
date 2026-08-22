@@ -9,6 +9,7 @@ from econochart.data.cleanup_legacy import _validated_target
 from econochart.data.generator import generate_companies
 from econochart.data.public import _chartqapro_example
 from econochart.data.schema import validate_record
+from econochart.data.subsets import select_grpo_records, select_sft_records, select_validation_records
 from econochart.data.training import make_grpo_example, make_sft_example
 from econochart.data.validate import validate_dataset
 from econochart.io import read_jsonl
@@ -90,6 +91,65 @@ class DataPipelineTests(unittest.TestCase):
         grpo = make_grpo_example(grpo_record)
         self.assertIsNotNone(grpo)
         self.assertEqual(grpo["prompt"][1]["content"][0], {"type": "image"})
+
+    def test_sft_subsets_are_nested_deterministic_and_cover_every_train_chart(self) -> None:
+        root = ROOT / "data" / "samples" / "econochart_v2" / "annotations"
+        rows = list(read_jsonl(root / "train.jsonl"))
+        first_screen, first_train = select_sft_records(
+            rows,
+            screen_records_per_chart=1,
+            train_records_per_chart=2,
+            seed=20260821,
+        )
+        second_screen, second_train = select_sft_records(
+            rows,
+            screen_records_per_chart=1,
+            train_records_per_chart=2,
+            seed=20260821,
+        )
+        self.assertEqual(first_screen, second_screen)
+        self.assertEqual(first_train, second_train)
+        self.assertEqual(len(first_screen), 12)
+        self.assertEqual(len(first_train), 24)
+        self.assertEqual(len({row["chart_id"] for row in first_screen}), 12)
+        self.assertEqual(len({row["chart_id"] for row in first_train}), 12)
+        self.assertEqual(len({row["entity_id"] for row in first_train}), 6)
+        self.assertTrue({row["id"] for row in first_screen} <= {row["id"] for row in first_train})
+
+    def test_grpo_subset_preserves_entities_and_requested_task_quota(self) -> None:
+        root = ROOT / "data" / "samples" / "econochart_v2" / "annotations"
+        rows = list(read_jsonl(root / "grpo_train.jsonl"))
+        weights = {
+            "numerical_reasoning": 0.25,
+            "relationship_analysis": 0.25,
+            "risk_diagnosis": 0.20,
+            "trend_analysis": 0.10,
+            "value_retrieval": 0.20,
+        }
+        selected = select_grpo_records(rows, prompt_count=9, task_weights=weights, seed=20260821)
+        repeated = select_grpo_records(rows, prompt_count=9, task_weights=weights, seed=20260821)
+        self.assertEqual(selected, repeated)
+        self.assertEqual(len(selected), 9)
+        self.assertEqual(len({row["chart_id"] for row in selected}), 9)
+        self.assertEqual(len({row["entity_id"] for row in selected}), 6)
+        self.assertEqual(
+            {task: sum(row["task_type"] == task for row in selected) for task in weights},
+            {
+                "numerical_reasoning": 2,
+                "relationship_analysis": 2,
+                "risk_diagnosis": 2,
+                "trend_analysis": 1,
+                "value_retrieval": 2,
+            },
+        )
+
+    def test_development_panel_is_sampled_only_from_validation(self) -> None:
+        root = ROOT / "data" / "samples" / "econochart_v2" / "annotations"
+        rows = list(read_jsonl(root / "val.jsonl"))
+        selected = select_validation_records(rows, sample_count=4, seed=20260821)
+        self.assertEqual(len(selected), 4)
+        self.assertTrue(all(row["split"] == "val" for row in selected))
+        self.assertEqual(selected, select_validation_records(rows, sample_count=4, seed=20260821))
 
     def test_legacy_cleanup_rejects_targets_outside_data(self) -> None:
         with self.assertRaises(ValueError):

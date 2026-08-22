@@ -41,7 +41,7 @@ LoRA/QLoRA 是 SFT 的参数更新方式，不是“先全参数 SFT、再 LoRA�
 | ChartQAPro test | 高难真实图表挑战集 | 否 | 否 |
 | `data/samples/econochart_v2` | 代码测试与 GitHub 展示 | 否 | 是 |
 
-默认 v2 配置生成 3,000 家企业、6,000 张图、24,000 条任务对齐问答；实际数量、分布和校验哈希以每次构建生成的 `manifest.json` 为准。公开数据的许可和用途见 [数据卡](docs/data_card.md)。
+默认 v2 配置生成 3,000 家企业、6,000 张图、24,000 条任务对齐问答；实际数量、分布和校验哈希以每次构建生成的 `manifest.json` 为准。正式训练使用确定性、覆盖率约束的预算子集：4,800 条 SFT 参数筛选、9,600 条正式 SFT、3,600 条 GRPO prompt，以及仅来自 val 的 512 条开发面板；2,496 条内部 test 保持完整。公开数据的许可和用途见 [数据卡](docs/data_card.md)。
 
 ## AutoDL 最短可信闭环
 
@@ -57,6 +57,7 @@ econochart-preflight --stage data --config configs/data/econochart_v2.yaml \
   --report outputs/preflight/data.json
 econochart-build --config configs/data/econochart_v2.yaml
 econochart-validate --dataset-root data/generated/econochart_v2 --full-image-scan
+econochart-build-subsets --config configs/data/training_subsets.yaml
 
 econochart-preflight --stage eval --config configs/eval/base_internal.yaml \
   --report outputs/preflight/base_eval.json
@@ -66,6 +67,13 @@ econochart-preflight --stage sft --config configs/train/sft_qlora_smoke.yaml \
   --report outputs/preflight/sft_smoke.json
 econochart-sft --config configs/train/sft_qlora_smoke.yaml
 
+# 固定 4,800 条筛选集和 512 条 val 面板；只比较高价值候选。
+econochart-sft --config configs/train/sft_qlora_r8_ablation.yaml
+econochart-sft --config configs/train/sft_qlora_r16_screen.yaml
+econochart-sft --config configs/train/sft_qlora_lr5e5_ablation.yaml
+econochart-sft --config configs/train/sft_qlora_lr2e4_ablation.yaml
+
+# 根据固定 val 面板选择参数后，再运行 9,600 条、2 epochs 的正式 SFT。
 econochart-sft --config configs/train/sft_qlora_4090.yaml
 export ECONOCHART_ADAPTER_PATH=outputs/sft_qlora_r16_domain_v1/final_adapter
 
@@ -112,9 +120,12 @@ econochart-compare \
 | rank / alpha | 16 / 32 | 容量与成本折中；另测 r=8、32 |
 | 有效 batch | 16 | 单卡 batch=1、累积 16，稳定 adapter 更新 |
 | SFT LR | `1e-4` | adapter 常用起点；另测 `5e-5`、`2e-4` |
+| 参数筛选数据 | 4,800 × 1 epoch | 每张训练图保留 1 题，用固定 512 条 val 面板选参 |
+| 正式 SFT 数据 | 9,600 × 2 epochs | 每张训练图保留 2 题，覆盖全部 2,400 家企业和 4,800 张图 |
 | 视觉 token 上限 | 1024 | 图表可读性与显存的主要折中旋钮 |
 | GRPO smoke | 2 generations、beta=0 | 4090 先验证完整链路，关闭 KL/reference-policy 路径以降低开销 |
 | 正式 GRPO | 4 generations、beta=0.001 | 高显存配置再验证相对奖励与 KL 约束 |
+| 正式 GRPO 数据 | 3,600 prompts × 4 | 覆盖全部训练企业，共 14,400 次 rollout |
 
 这些值是实验起点，不是事后包装的“最优参数”。最终选择必须引用显存、吞吐、验证集和外部基准结果。详细理由与降级顺序见 [实验协议](docs/experiment_protocol.md)。
 
@@ -128,7 +139,7 @@ data/
 docs/                    架构、数据卡、AutoDL、实验与面试材料
 experiments/             实验矩阵、记录模板和聚合结果
 src/econochart/
-  data/                  生成、公开数据适配、schema、训练视图、质检
+  data/                  生成、覆盖率约束子集、公开数据适配、schema、训练视图、质检
   models/                Qwen3-VL/量化/adapter 加载
   training/              SFT 与 GRPO
   rewards/               可单测 reward 组件

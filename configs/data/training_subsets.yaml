@@ -1,0 +1,27 @@
+seed: 20260821
+
+data:
+  dataset_root: data/generated/econochart_v2
+  output_dir: data/generated/econochart_v2/subsets
+  # Frozen after the validated 2026-08-22 build. A different full dataset must
+  # receive a new data version instead of silently reusing these subsets.
+  source_manifest_sha256: a7aba20b3fccd2c3740f3873f327e525bb3b224a5722128b5de52cd1f28f7baa
+
+selection:
+  sft:
+    # The 4,800-row screen is nested in the 9,600-row final subset.
+    # Every train chart contributes one row to screening and two rows to final SFT.
+    screen_records_per_chart: 1
+    train_records_per_chart: 2
+  grpo:
+    # Covers every train entity at least once and 75% of the 4,800 train charts.
+    prompts: 3600
+    task_weights:
+      numerical_reasoning: 0.25
+      relationship_analysis: 0.25
+      risk_diagnosis: 0.20
+      trend_analysis: 0.10
+      value_retrieval: 0.20
+  validation:
+    # Development-only generation panel. The 2,496-row test set remains untouched.
+    rows: 512
