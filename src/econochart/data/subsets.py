@@ -48,21 +48,31 @@ def _max_flow(graph: list[list[_FlowEdge]], source: int, sink: int) -> int:
 
         positions = [0] * len(graph)
 
-        def send(node: int, amount: int) -> int:
+        def send(
+            node: int,
+            amount: int,
+            current_levels: list[int],
+            current_positions: list[int],
+        ) -> int:
             if node == sink:
                 return amount
-            while positions[node] < len(graph[node]):
-                edge = graph[node][positions[node]]
-                if edge.capacity > 0 and levels[node] + 1 == levels[edge.to]:
-                    pushed = send(edge.to, min(amount, edge.capacity))
+            while current_positions[node] < len(graph[node]):
+                edge = graph[node][current_positions[node]]
+                if edge.capacity > 0 and current_levels[node] + 1 == current_levels[edge.to]:
+                    pushed = send(
+                        edge.to,
+                        min(amount, edge.capacity),
+                        current_levels,
+                        current_positions,
+                    )
                     if pushed:
                         edge.capacity -= pushed
                         graph[edge.to][edge.reverse].capacity += pushed
                         return pushed
-                positions[node] += 1
+                current_positions[node] += 1
             return 0
 
-        while pushed := send(source, 10**9):
+        while pushed := send(source, 10**9, levels, positions):
             total += pushed
 
 
