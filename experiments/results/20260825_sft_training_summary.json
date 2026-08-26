@@ -1,0 +1,84 @@
+{
+  "experiment_id": "sft_qlora_r16_domain_v1",
+  "checkpoint_stage": "sft_training",
+  "status": "passed",
+  "seed": 20260821,
+  "source_commit": "953ca23cb20f3d347e049abe7c99d4ada2eead6a",
+  "source_state": {
+    "git_dirty": true,
+    "commit_alone_reproduces_runtime_config": false,
+    "runtime_relevant_dirty_files": [
+      "configs/train/sft_qlora_4090.yaml"
+    ],
+    "source_config_sha256": "f0facbe6c4e2bff88ce8ff947d74f9bf19a31a7ffd935bdd90bd1e72f5fa17fb",
+    "authoritative_runtime_config": "outputs/sft_qlora_r16_domain_v1/resolved_config.yaml",
+    "note": "Commit 953ca23 still contains learning_rate=1e-4; the formal run used the uncommitted, audited learning_rate=2e-4 configuration recorded here and in resolved_config.yaml."
+  },
+  "started_at": "2026-08-25T13:50:55+08:00",
+  "finished_at": "2026-08-25T21:21:25+08:00",
+  "source_config": "configs/train/sft_qlora_4090.yaml",
+  "data": {
+    "train_path": "data/generated/econochart_v2/subsets/sft_train_9600.jsonl",
+    "train_rows": 9600,
+    "eval_path": "data/generated/econochart_v2/subsets/val_512.jsonl",
+    "eval_rows": 512
+  },
+  "selected_hyperparameters": {
+    "epochs": 2,
+    "learning_rate": 0.0002,
+    "lr_scheduler_type": "cosine",
+    "warmup_ratio": 0.03,
+    "optimizer": "paged_adamw_8bit",
+    "weight_decay": 0.01,
+    "max_grad_norm": 1.0,
+    "per_device_train_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "effective_batch_size": 16,
+    "rank": 16,
+    "alpha": 32,
+    "adapter_dropout": 0.05,
+    "quantization": "nf4_4bit_double_quant",
+    "compute_dtype": "bfloat16",
+    "train_vision": false,
+    "train_projector": false
+  },
+  "training": {
+    "global_step": 1200,
+    "trainable_parameters": 33030144,
+    "train_loss": 0.17223717272281647,
+    "train_runtime_seconds": 26816.8527,
+    "train_samples_per_second": 0.716,
+    "train_steps_per_second": 0.045
+  },
+  "teacher_forced_evaluation": {
+    "eval_loss": 0.11699797213077545,
+    "eval_runtime_seconds": 188.5806,
+    "eval_samples_per_second": 2.715,
+    "history": [
+      {"step": 250, "epoch": 0.4166666666666667, "eval_loss": 0.15085379779338837},
+      {"step": 500, "epoch": 0.8333333333333334, "eval_loss": 0.13536569476127625},
+      {"step": 750, "epoch": 1.25, "eval_loss": 0.12678903341293335},
+      {"step": 1000, "epoch": 1.6666666666666665, "eval_loss": 0.11737591028213501},
+      {"step": 1200, "epoch": 2.0, "eval_loss": 0.11699797213077545}
+    ]
+  },
+  "adapter": {
+    "path": "outputs/sft_qlora_r16_domain_v1/final_adapter/adapter_model.safetensors",
+    "sha256": "2814fd0289533a37eeb7e6c25c1f9eff2232b882b05454a5efcd52141ba4ef39",
+    "size_mib": 63.072
+  },
+  "retained_checkpoints": [
+    "checkpoint-1000",
+    "checkpoint-1200"
+  ],
+  "source_evidence": {
+    "run_directory": "outputs/sft_qlora_r16_domain_v1",
+    "trainer_state": "outputs/sft_qlora_r16_domain_v1/trainer_state.json",
+    "run_manifest": "outputs/sft_qlora_r16_domain_v1/run_manifest.json",
+    "resolved_config": "outputs/sft_qlora_r16_domain_v1/resolved_config.yaml"
+  },
+  "interpretation_limits": [
+    "Teacher-forced eval loss is an optimization diagnostic, not a capability score.",
+    "Capability claims are reported separately from the frozen 2,496-row internal test and paired comparison."
+  ]
+}

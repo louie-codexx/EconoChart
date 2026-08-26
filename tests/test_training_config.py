@@ -58,6 +58,17 @@ class TrainingConfigTests(unittest.TestCase):
             self.assertEqual(summary["effective_batch_size"] % summary["num_generations"], 0)
             self.assertGreaterEqual(summary["prompts_per_update"], 1)
 
+    def test_formal_grpo_config_locks_the_48g_run_budget(self) -> None:
+        config = load_config("configs/train/grpo_qlora_48g.yaml")
+        training = config["training"]
+        self.assertEqual(config["data"]["train"][0]["expected_rows"], 3600)
+        self.assertEqual(config["data"]["eval"][0]["expected_rows"], 512)
+        self.assertEqual(training["num_generations"], 4)
+        self.assertEqual(training["gradient_accumulation_steps"], 4)
+        self.assertEqual(training["learning_rate"], 0.000005)
+        self.assertEqual(training["beta"], 0.001)
+        self.assertEqual(training["save_steps"], 100)
+
     def test_invalid_grpo_batch_is_rejected(self) -> None:
         with self.assertRaises(ConfigError):
             validate_grpo_batch(
@@ -77,6 +88,17 @@ class TrainingConfigTests(unittest.TestCase):
         self.assertEqual(config["adapter"]["target_modules"][0], "q_proj")
         self.assertEqual(config["model"]["quantization"]["mode"], "4bit")
         self.assertEqual(config["training"]["learning_rate"], 0.0001)
+
+    def test_formal_sft_config_locks_selected_hyperparameters(self) -> None:
+        config = load_config("configs/train/sft_qlora_4090.yaml")
+        self.assertEqual(config["adapter"]["r"], 16)
+        self.assertEqual(config["adapter"]["alpha"], 32)
+        self.assertEqual(config["training"]["learning_rate"], 0.0002)
+        self.assertEqual(config["training"]["num_train_epochs"], 2)
+        self.assertEqual(config["data"]["train"][0]["expected_rows"], 9600)
+
+        central_screen = load_config("configs/train/sft_qlora_r16_screen.yaml")
+        self.assertEqual(central_screen["training"]["learning_rate"], 0.0001)
 
     def test_rank_candidates_match_each_selected_learning_rate(self) -> None:
         pairs = (
@@ -132,9 +154,15 @@ class TrainingConfigTests(unittest.TestCase):
         self.assertTrue(all(row["split"] == "val" for row in records))
 
     def test_formal_and_development_configs_freeze_their_row_counts(self) -> None:
-        formal = load_config("configs/eval/base_internal.yaml")
+        base = load_config("configs/eval/base_internal.yaml")
+        formal = load_config("configs/eval/sft_internal.yaml")
         development = load_config("configs/eval/development_val_512.yaml")
-        self.assertEqual(formal["data"]["test"][0]["expected_rows"], 2496)
+        self.assertEqual(base["data"]["test"][0]["expected_rows"], 2496)
+        self.assertEqual(formal["experiment"]["checkpoint_stage"], "sft")
+        self.assertEqual(formal["model"]["adapter_path"], "outputs/sft_qlora_r16_domain_v1/final_adapter")
+        self.assertEqual(formal["data"]["test"], base["data"]["test"])
+        self.assertEqual(formal["generation"], base["generation"])
+        self.assertEqual(formal["evaluation"]["expected_split"], "test")
         self.assertEqual(development["evaluation"]["expected_split"], "val")
         self.assertEqual(development["data"]["test"][0]["expected_rows"], 512)
 

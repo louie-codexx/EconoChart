@@ -16,3 +16,4 @@ adapter:
 training:
   output_dir: outputs/screen/sft_qlora_r8_lr1e4
   num_train_epochs: 1
+  learning_rate: 0.0001

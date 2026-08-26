@@ -1,0 +1,46 @@
+{
+  "experiment_id": "grpo_qlora_4090_from_formal_sft_v1",
+  "checkpoint_stage": "grpo_smoke",
+  "status": "passed",
+  "seed": 20260821,
+  "started_at": "2026-08-26T17:52:03+08:00",
+  "finished_at": "2026-08-26T17:53:19+08:00",
+  "global_step": 2,
+  "training": {
+    "train_runtime_seconds": 52.8447,
+    "train_samples_per_second": 0.076,
+    "train_steps_per_second": 0.038,
+    "train_loss": -0.00004142988473176956
+  },
+  "adapter": {
+    "input_sha256": "2814fd0289533a37eeb7e6c25c1f9eff2232b882b05454a5efcd52141ba4ef39",
+    "output_sha256": "742a8e607f54be9109bf2b0ae869f2a32a5cd4dd5d1085551c1e30782df2115e",
+    "input_tensors": 504,
+    "output_tensors": 504,
+    "common_tensors": 504,
+    "changed_tensors": 504,
+    "max_abs_delta": 0.0001220703125,
+    "output_size_bytes": 66135336,
+    "reload": {
+      "status": "PASS",
+      "quantized_base": true,
+      "trainable_parameters": 33030144,
+      "trainable_tensors": 504,
+      "trainable_parameters_by_component": {
+        "vision": 0,
+        "projector": 0,
+        "language_or_other": 33030144
+      }
+    }
+  },
+  "source_evidence": {
+    "run_directory": "outputs/smoke/grpo_qlora_4090_from_formal_sft_v1",
+    "trainer_state": "outputs/smoke/grpo_qlora_4090_from_formal_sft_v1/trainer_state.json",
+    "run_manifest": "outputs/smoke/grpo_qlora_4090_from_formal_sft_v1/run_manifest.json",
+    "resolved_config": "outputs/smoke/grpo_qlora_4090_from_formal_sft_v1/resolved_config.yaml"
+  },
+  "notes": [
+    "The smoke run is a compatibility gate, not a capability result.",
+    "NaN values for trend or risk component rewards occurred only on samples where those components were not applicable."
+  ]
+}

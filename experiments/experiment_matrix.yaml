@@ -47,17 +47,31 @@ experiments:
 
   - id: S1_qlora_r16_domain
     stage: sft
-    status: code_ready
+    status: completed
     config: configs/train/sft_qlora_4090.yaml
     control: B0_base_internal_external
+    output: outputs/sft_qlora_r16_domain_v1/final_adapter
+    evaluation_config: configs/eval/sft_internal.yaml
+    evidence:
+      training_summary: experiments/results/20260825_sft_training_summary.json
+      summary: experiments/results/20260826_sft_internal_summary.json
+      artifact_audit: outputs/evaluation/sft_qlora_r16_domain_v1_internal_v1_artifact_audit_v1.json
+      paired_report: outputs/evaluation/base_internal_v1_to_sft_qlora_r16_domain_v1_internal_v1_paired_v1.json
     hypothesis: LLM-only QLoRA improves domain structure and verifiable reasoning on a 24GB GPU.
     data_budget: 9,600 rows x 2 epochs; all 2,400 train entities and 4,800 charts retained.
+    selected_hyperparameters:
+      learning_rate: 0.0002
+      rank: 16
+      alpha: 32
+    selection_evidence: On the fixed 512-row validation panel, 2e-4 reliably beat 1e-4; at 2e-4, rank 16 beat rank 8 by 0.011745 overall with paired 95% CI [0.002010, 0.020636].
+    result: Formal SFT completed on 9,600 rows for 2 epochs. The audited 2,496-row internal test scored 0.806499 overall and 0.752796 hard overall; versus Base, paired overall delta was +0.456719 with 95% CI [0.448794, 0.464756].
+    pending_guardrails: [ChartQA, ChartQAPro, qualitative_failure_review]
     primary_metrics: [overall, numeric, trend, evidence, risk]
     guardrails: [ChartQA, ChartQAPro, output_length, format]
 
   - id: S2_rank_ablation
     stage: sft_ablation
-    status: code_ready
+    status: completed
     prerequisite: S3_learning_rate_ablation selects the learning rate with rank fixed at 16.
     matched_learning_rate_configs:
       5e-5:
@@ -72,11 +86,12 @@ experiments:
     conditional_configs: [configs/train/sft_qlora_r32_ablation.yaml]
     data_budget: 4,800 rows x 1 epoch; compare on the same val_512 IDs.
     single_factor: adapter rank (8/16; run 32 only if 16 is capacity-limited), alpha fixed at 2r
+    result: Rank 16 selected at learning rate 2e-4; rank 32 was not triggered because hard/risk evidence did not show residual capacity limitation.
     decision: Select the smallest rank whose quality gain is supported by paired metrics.
 
   - id: S3_learning_rate_ablation
     stage: sft_ablation
-    status: code_ready
+    status: completed
     configs:
       - configs/train/sft_qlora_lr5e5_ablation.yaml
       - configs/train/sft_qlora_r16_screen.yaml
@@ -84,6 +99,7 @@ experiments:
     data_budget: 4,800 rows x 1 epoch; compare on the same val_512 IDs.
     single_factor: learning rate (5e-5/1e-4/2e-4)
     fixed_anchor: rank 16, alpha 32
+    result: Learning rate 2e-4 selected; paired validation improved overall, numeric, numeric recall, numeric precision, trend, and hard overall versus 1e-4.
     decision: Select by the fixed internal validation panel, optimization stability, and efficiency; never use external test results for selection.
 
   - id: S4_quantization_ablation
@@ -106,17 +122,24 @@ experiments:
 
   - id: R0_grpo_4090_smoke
     stage: grpo
-    status: code_ready
+    status: completed
     config: configs/train/grpo_qlora_4090_smoke.yaml
     prerequisite: selected and evaluated SFT adapter
+    output: outputs/smoke/grpo_qlora_4090_from_formal_sft_v1/final_adapter
+    evidence: experiments/results/20260826_grpo_smoke_summary.json
     hypothesis: Qwen3-VL VLM rollouts and all offline-tested rewards are compatible on 24GB.
     primary_metrics: [finite_loss, reward_variance, peak_vram_gib, adapter_reload]
+    result: Two optimization steps completed with finite loss; all 504 adapter tensors changed and the saved quantized adapter reloaded successfully.
 
   - id: R1_grpo_48g_full
     stage: grpo
-    status: code_ready
+    status: running
     config: configs/train/grpo_qlora_48g.yaml
     prerequisite: R0 smoke and SFT-to-GRPO gate
+    output: outputs/grpo_qlora_48g_domain_v1
+    launched_at: 2026-08-26T18:31:25+08:00
+    launch_environment: RTX 4090 vGPU with 47.37 GiB visible memory
+    launch_gate: Preflight passed with 3,600 train rows, 512 eval rows, 4 generations, and effective batch size 4.
     hypothesis: Verifiable GRPO improves numeric and trend correctness without reward hacking or external regression.
     data_budget: 3,600 prompts x 4 generations = 14,400 rollouts; every train entity appears at least once.
     primary_metrics: [overall, numeric, trend]

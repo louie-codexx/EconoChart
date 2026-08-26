@@ -4,7 +4,7 @@
 
 EconoChart 不把“跑一次 LoRA”当作项目结论，而是建立一条可审计的实验链：无泄漏数据 → base 基线 → LoRA/QLoRA SFT → 分能力评测与消融 → 可验证 GRPO → 失败复盘。目标能力包括图表理解、数值推理、经营风险诊断和证据约束的决策建议。
 
-> 当前状态：数据、训练、奖励、评测、预检和 CPU 测试代码已实现；仓库内 8 家企业/16 张图/64 条问答样例通过完整校验。GPU 基线、SFT 与 GRPO 结果必须在 AutoDL 实际运行后填写，仓库不会预先声称未经验证的提升。
+> 当前状态（2026-08-26）：数据与固定评测面板已冻结，正式 SFT 已完成并通过 2,496 条内部测试审计；相对 Base 的 overall 成对提升为 `+0.456719`，95% CI 为 `[0.448794, 0.464756]`。两步 GRPO smoke 已通过保存、张量更新和重载检查，48GB GPU 上的正式 GRPO 正在运行。GRPO 最终能力结论和外部 ChartQA/ChartQAPro guardrail 仍待评测，仓库不会提前宣称结果。
 
 ## 为什么这个项目不是普通微调 Demo
 
@@ -78,13 +78,30 @@ econochart-sft --config configs/train/sft_qlora_lr2e4_ablation.yaml
 econochart-sft --config configs/train/sft_qlora_4090.yaml
 export ECONOCHART_ADAPTER_PATH=outputs/sft_qlora_r16_domain_v1/final_adapter
 
-econochart-eval --config configs/eval/base_internal.yaml \
+econochart-preflight --stage eval --config configs/eval/sft_internal.yaml \
+  --model "$ECONOCHART_MODEL_PATH" \
   --adapter "$ECONOCHART_ADAPTER_PATH" \
-  --output-dir outputs/evaluation/sft_internal_v1
+  --report outputs/preflight/sft_internal.json
+econochart-eval --config configs/eval/sft_internal.yaml \
+  --model "$ECONOCHART_MODEL_PATH" \
+  --adapter "$ECONOCHART_ADAPTER_PATH"
 
 econochart-preflight --stage grpo --config configs/train/grpo_qlora_4090_smoke.yaml \
+  --model "$ECONOCHART_MODEL_PATH" \
+  --adapter "$ECONOCHART_ADAPTER_PATH" \
   --report outputs/preflight/grpo_smoke.json
-econochart-grpo --config configs/train/grpo_qlora_4090_smoke.yaml
+econochart-grpo --config configs/train/grpo_qlora_4090_smoke.yaml \
+  --model "$ECONOCHART_MODEL_PATH" \
+  --adapter "$ECONOCHART_ADAPTER_PATH"
+
+# 仅在 smoke gate 通过且有约 48 GiB 可用显存时启动正式 GRPO。
+econochart-preflight --stage grpo --config configs/train/grpo_qlora_48g.yaml \
+  --model "$ECONOCHART_MODEL_PATH" \
+  --adapter "$ECONOCHART_ADAPTER_PATH" \
+  --report outputs/preflight/grpo_48g.json
+econochart-grpo --config configs/train/grpo_qlora_48g.yaml \
+  --model "$ECONOCHART_MODEL_PATH" \
+  --adapter "$ECONOCHART_ADAPTER_PATH"
 ```
 
 不要从数据构建直接跳到 GRPO。必须先保存 base 预测、完成 SFT smoke、评测 SFT adapter，并确认数值/趋势提升没有以格式或外部泛化显著退化为代价。完整执行顺序、环境检查和 OOM 处理见 [AutoDL 手册](docs/autodl_runbook.md)。
@@ -104,8 +121,8 @@ ChartQAPro 只用于最终测试。评测会额外生成 `chartqapro_official_pr
 ```bash
 econochart-compare \
   --baseline outputs/evaluation/base_internal_v1/predictions.jsonl \
-  --candidate outputs/evaluation/sft_internal_v1/predictions.jsonl \
-  --output outputs/evaluation/base_vs_sft.json
+  --candidate outputs/evaluation/sft_qlora_r16_domain_v1_internal_v1/predictions.jsonl \
+  --output outputs/evaluation/base_internal_v1_to_sft_qlora_r16_domain_v1_internal_v1_paired_v1.json
 ```
 
 比较器严格对齐样本 ID 和 reference 字段，并用成对 bootstrap 输出 95% 置信区间。总体均值之外，还按任务、视图、行业、难度和经营场景切片，回答“哪些能力真的改善、哪些没有”。
@@ -120,7 +137,7 @@ econochart-compare \
 | LoRA target | LLM attention + MLP projections | 默认冻结视觉塔和投影层，先隔离语言/推理适配效果 |
 | rank / alpha | 16 / 32 | 容量与成本折中；另测 r=8、32 |
 | 有效 batch | 16 | 单卡 batch=1、累积 16，稳定 adapter 更新 |
-| SFT LR | `1e-4` | adapter 常用起点；另测 `5e-5`、`2e-4` |
+| SFT LR | `2e-4` | 固定 512 条 val 面板在 `5e-5`、`1e-4`、`2e-4` 中选出；正式配置已锁定 |
 | 参数筛选数据 | 4,800 × 1 epoch | 每张训练图保留 1 题，用固定 512 条 val 面板选参 |
 | 正式 SFT 数据 | 9,600 × 2 epochs | 每张训练图保留 2 题，覆盖全部 2,400 家企业和 4,800 张图 |
 | 视觉 token 上限 | 1024 | 图表可读性与显存的主要折中旋钮 |
