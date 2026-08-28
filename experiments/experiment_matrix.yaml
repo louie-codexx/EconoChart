@@ -133,21 +133,34 @@ experiments:
 
   - id: R1_grpo_48g_full
     stage: grpo
-    status: running
+    status: completed
     config: configs/train/grpo_qlora_48g.yaml
     prerequisite: R0 smoke and SFT-to-GRPO gate
     output: outputs/grpo_qlora_48g_domain_v1
     launched_at: 2026-08-26T18:31:25+08:00
+    completed_at: 2026-08-27T22:35:16+08:00
     launch_environment: RTX 4090 vGPU with 47.37 GiB visible memory
     launch_gate: Preflight passed with 3,600 train rows, 512 eval rows, 4 generations, and effective batch size 4.
+    recovery: Resumed from the audited checkpoint-2900 after an AutoDL billing shutdown; upgraded only the Torch runtime for the Transformers security gate and forced UTF-8 for the TRL model-card template. Training objectives and hyperparameters were unchanged.
+    evaluation_config: configs/eval/grpo_internal.yaml
+    evidence:
+      summary: experiments/results/20260828_grpo_internal_summary.json
+      artifact_audit: outputs/evaluation/grpo_qlora_48g_domain_v1_internal_v1_artifact_audit_v1.json
+      sft_to_grpo_paired_report: outputs/evaluation/sft_internal_v1_to_grpo_internal_v1_paired_v1.json
+      base_to_grpo_paired_report: outputs/evaluation/base_internal_v1_to_grpo_internal_v1_paired_v1.json
     hypothesis: Verifiable GRPO improves numeric and trend correctness without reward hacking or external regression.
     data_budget: 3,600 prompts x 4 generations = 14,400 rollouts; every train entity appears at least once.
+    result: Training reached step 3,600 and the final adapter passed static and reload audits. On the audited 2,496-row internal test, GRPO scored 0.806343 overall and 0.754140 hard overall.
+    attribution: Versus SFT, paired overall delta was -0.000157 with 95% CI [-0.002294, 0.002112]; every metric was inconclusive, so R1 established neither a significant incremental gain nor a significant regression. Versus Base, overall delta was +0.456563, but this is the cumulative SFT-plus-GRPO effect and is not attributable to GRPO alone.
+    decision: Do not claim an incremental GRPO capability gain; finish external and qualitative guardrails before the final conclusion.
+    pending_guardrails: [ChartQA, ChartQAPro, qualitative_failure_review]
     primary_metrics: [overall, numeric, trend]
     guardrails: [format, evidence, risk, ChartQA, ChartQAPro, output_length]
 
   - id: R2_reward_ablation
     stage: grpo_ablation
-    status: planned
+    status: not_triggered
     variants: [all_rewards, no_format_or_length, no_numeric, no_trend]
     prerequisite: R1 provides a measurable non-zero effect
+    result: R1 did not establish a measurable non-zero SFT-to-GRPO effect on the fixed internal test.
     decision: Attribute RL gains to capability rewards rather than surface structure.

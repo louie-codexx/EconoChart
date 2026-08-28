@@ -1,0 +1,281 @@
+{
+  "experiment_id": "grpo_qlora_48g_domain_v1_internal_v1",
+  "checkpoint_stage": "grpo",
+  "status": "passed",
+  "seed": 20260821,
+  "training": {
+    "global_step": 3600,
+    "max_steps": 3600,
+    "train_rows": 3600,
+    "num_generations": 4,
+    "rollout_budget": 14400,
+    "effective_batch_size": 4,
+    "configured_learning_rate": 0.000005,
+    "beta": 0.001,
+    "epsilon": 0.2,
+    "max_completion_length": 256,
+    "train_runtime_seconds": 14168.0566,
+    "train_samples_per_second": 0.254,
+    "train_steps_per_second": 0.254,
+    "train_loss": -9.206002092064914e-07,
+    "final_scheduler_lr": [0.0, 0.0],
+    "finished_at": "2026-08-27T22:35:16+08:00"
+  },
+  "recovery_events": [
+    {
+      "event": "AutoDL instance stopped after a billing interruption",
+      "recovery_point": "outputs/grpo_qlora_48g_domain_v1/checkpoint-2900",
+      "verification": "trainer, optimizer, scheduler, RNG, and adapter states deep-loaded successfully",
+      "training_objective_changed": false
+    },
+    {
+      "event": "Transformers rejected torch.load with torch 2.5.1 because of its security version gate",
+      "action": "upgraded torch and torchvision to 2.6.0+cu118 and 0.21.0+cu118",
+      "verification": "CPU checkpoint deep-load and GPU preflight passed",
+      "training_objective_changed": false
+    },
+    {
+      "event": "TRL model-card template decoding raised UnicodeDecodeError at the step-3000 save boundary",
+      "action": "relaunched with PYTHONUTF8=1, LANG=C.UTF-8, and LC_ALL=C.UTF-8",
+      "verification": "training passed step 3000, reached step 3600, and exited with code 0",
+      "training_objective_changed": false
+    }
+  ],
+  "adapter": {
+    "path": "outputs/grpo_qlora_48g_domain_v1/final_adapter",
+    "sha256": "d47c083114e26000c1df5bd52676a1ca9dc2ca708a70c7944c97b3824404486b",
+    "size_bytes": 66135336,
+    "trainable_tensors": 504,
+    "trainable_parameters": 33030144,
+    "all_tensors_finite": true,
+    "reload_status": "PASS",
+    "quantized_base": true
+  },
+  "evaluation": {
+    "started_at": "2026-08-28T19:07:35+08:00",
+    "finished_at": "2026-08-28T22:20:42+08:00",
+    "rows": 2496,
+    "unique_ids": 2496,
+    "exit_code": 0,
+    "artifact_audit": "PASS",
+    "log_error_matches": []
+  },
+  "hashes": {
+    "test_sha256": "5f4549c793a8484d1803f78e0703103b41ecd97f90789452747d925fcc0dc95",
+    "adapter_sha256": "d47c083114e26000c1df5bd52676a1ca9dc2ca708a70c7944c97b3824404486b",
+    "sft_to_grpo_paired_report_sha256": "4b9d99583db715dc4daa357ac349d4df6b36befcf605dde7fd24f69f4ad3aa60",
+    "base_to_grpo_paired_report_sha256": "0302ed784b2187fe65989490e9f61c056e32dba8bb8563f8d143299c5e9d8764"
+  },
+  "metrics": {
+    "overall": 0.806343,
+    "numeric": 0.593353,
+    "numeric_recall": 0.567141,
+    "numeric_precision": 0.692619,
+    "trend": 0.958716,
+    "evidence": 0.999366,
+    "risk": 0.689895,
+    "format": 1.0,
+    "length": 1.0,
+    "hard_overall": 0.75414
+  },
+  "efficiency": {
+    "mean_latency_seconds": 4.607535,
+    "median_latency_seconds": 4.740763,
+    "samples_per_second": 0.217036,
+    "mean_completion_tokens": 68.294
+  },
+  "paired_sft_to_grpo": {
+    "baseline_rows": 2496,
+    "candidate_rows": 2496,
+    "bootstrap_samples": 2000,
+    "seed": 20260821,
+    "overall": {
+      "baseline_mean": 0.806499,
+      "candidate_mean": 0.806343,
+      "delta": -0.000157,
+      "bootstrap_95_ci": [-0.002294, 0.002112],
+      "probability_delta_positive": 0.4685,
+      "verdict": "INCONCLUSIVE"
+    },
+    "numeric": {
+      "baseline_mean": 0.59449,
+      "candidate_mean": 0.593353,
+      "delta": -0.001137,
+      "bootstrap_95_ci": [-0.00568, 0.003801],
+      "probability_delta_positive": 0.332,
+      "verdict": "INCONCLUSIVE"
+    },
+    "numeric_precision": {
+      "baseline_mean": 0.693176,
+      "candidate_mean": 0.692619,
+      "delta": -0.000557,
+      "bootstrap_95_ci": [-0.004674, 0.004038],
+      "probability_delta_positive": 0.412,
+      "verdict": "INCONCLUSIVE"
+    },
+    "numeric_recall": {
+      "baseline_mean": 0.569344,
+      "candidate_mean": 0.567141,
+      "delta": -0.002204,
+      "bootstrap_95_ci": [-0.006778, 0.002972],
+      "probability_delta_positive": 0.196,
+      "verdict": "INCONCLUSIVE"
+    },
+    "trend": {
+      "baseline_mean": 0.956881,
+      "candidate_mean": 0.958716,
+      "delta": 0.001835,
+      "bootstrap_95_ci": [0.0, 0.005505],
+      "probability_delta_positive": 0.6195,
+      "verdict": "INCONCLUSIVE"
+    },
+    "evidence": {
+      "baseline_mean": 0.999366,
+      "candidate_mean": 0.999366,
+      "delta": 0.0,
+      "bootstrap_95_ci": [0.0, 0.0],
+      "probability_delta_positive": 0.0,
+      "verdict": "INCONCLUSIVE"
+    },
+    "risk": {
+      "baseline_mean": 0.685105,
+      "candidate_mean": 0.689895,
+      "delta": 0.004791,
+      "bootstrap_95_ci": [-0.005226, 0.014808],
+      "probability_delta_positive": 0.809,
+      "verdict": "INCONCLUSIVE"
+    },
+    "format": {
+      "baseline_mean": 1.0,
+      "candidate_mean": 1.0,
+      "delta": 0.0,
+      "bootstrap_95_ci": [0.0, 0.0],
+      "probability_delta_positive": 0.0,
+      "verdict": "INCONCLUSIVE"
+    },
+    "length": {
+      "baseline_mean": 1.0,
+      "candidate_mean": 1.0,
+      "delta": 0.0,
+      "bootstrap_95_ci": [0.0, 0.0],
+      "probability_delta_positive": 0.0,
+      "verdict": "INCONCLUSIVE"
+    },
+    "hard_overall": {
+      "baseline_mean": 0.752796,
+      "candidate_mean": 0.75414,
+      "delta": 0.001344,
+      "bootstrap_95_ci": [-0.001918, 0.004498],
+      "probability_delta_positive": 0.8075,
+      "verdict": "INCONCLUSIVE"
+    }
+  },
+  "paired_base_to_grpo": {
+    "baseline_rows": 2496,
+    "candidate_rows": 2496,
+    "bootstrap_samples": 2000,
+    "seed": 20260821,
+    "overall": {
+      "baseline_mean": 0.34978,
+      "candidate_mean": 0.806343,
+      "delta": 0.456563,
+      "bootstrap_95_ci": [0.448926, 0.464645],
+      "probability_delta_positive": 1.0,
+      "verdict": "GRPO_BETTER"
+    },
+    "numeric": {
+      "baseline_mean": 0.240061,
+      "candidate_mean": 0.593353,
+      "delta": 0.353292,
+      "bootstrap_95_ci": [0.339557, 0.36716],
+      "probability_delta_positive": 1.0,
+      "verdict": "GRPO_BETTER"
+    },
+    "numeric_precision": {
+      "baseline_mean": 0.63614,
+      "candidate_mean": 0.692619,
+      "delta": 0.056479,
+      "bootstrap_95_ci": [0.044511, 0.068334],
+      "probability_delta_positive": 1.0,
+      "verdict": "GRPO_BETTER"
+    },
+    "numeric_recall": {
+      "baseline_mean": 0.225027,
+      "candidate_mean": 0.567141,
+      "delta": 0.342114,
+      "bootstrap_95_ci": [0.328357, 0.355636],
+      "probability_delta_positive": 1.0,
+      "verdict": "GRPO_BETTER"
+    },
+    "trend": {
+      "baseline_mean": 0.643119,
+      "candidate_mean": 0.958716,
+      "delta": 0.315596,
+      "bootstrap_95_ci": [0.286544, 0.346942],
+      "probability_delta_positive": 1.0,
+      "verdict": "GRPO_BETTER"
+    },
+    "evidence": {
+      "baseline_mean": 0.767528,
+      "candidate_mean": 0.999366,
+      "delta": 0.231838,
+      "bootstrap_95_ci": [0.220217, 0.243291],
+      "probability_delta_positive": 1.0,
+      "verdict": "GRPO_BETTER"
+    },
+    "risk": {
+      "baseline_mean": 0.059233,
+      "candidate_mean": 0.689895,
+      "delta": 0.630662,
+      "bootstrap_95_ci": [0.602341, 0.657666],
+      "probability_delta_positive": 1.0,
+      "verdict": "GRPO_BETTER"
+    },
+    "format": {
+      "baseline_mean": 0.0,
+      "candidate_mean": 1.0,
+      "delta": 1.0,
+      "bootstrap_95_ci": [1.0, 1.0],
+      "probability_delta_positive": 1.0,
+      "verdict": "GRPO_BETTER"
+    },
+    "length": {
+      "baseline_mean": 0.848039,
+      "candidate_mean": 1.0,
+      "delta": 0.151961,
+      "bootstrap_95_ci": [0.142423, 0.16147],
+      "probability_delta_positive": 1.0,
+      "verdict": "GRPO_BETTER"
+    },
+    "hard_overall": {
+      "baseline_mean": 0.283842,
+      "candidate_mean": 0.75414,
+      "delta": 0.470298,
+      "bootstrap_95_ci": [0.460662, 0.479236],
+      "probability_delta_positive": 1.0,
+      "verdict": "GRPO_BETTER"
+    }
+  },
+  "conclusion_zh": [
+    "在固定的2496条内部测试上，GRPO相对SFT的overall变化为-0.000157，95%置信区间跨越0；所有分项均为INCONCLUSIVE，因此不能宣称GRPO带来统计显著的边际提升，也没有证据表明其造成显著退化。",
+    "数值能力存在极小的方向性下降（numeric -0.001137，numeric recall -0.002204），趋势、风险和困难样本存在轻微方向性提升（trend +0.001835，risk +0.004791，hard overall +0.001344），但置信区间均不足以支持确定结论。",
+    "Base到GRPO的所有指标均显著提升，其中overall +0.456563、hard overall +0.470298；这反映SFT加GRPO整条后训练链的累计收益，不能把全部提升归因于GRPO。GRPO的独立边际作用只能依据SFT到GRPO配对比较。"
+  ],
+  "decision": {
+    "capability_claim": "Do not claim a statistically significant incremental GRPO gain over SFT.",
+    "r2_reward_ablation": "Not triggered because R1 did not establish the prerequisite measurable non-zero effect.",
+    "next": "Complete ChartQA, ChartQAPro, and qualitative non-regression guardrails before the final project conclusion."
+  },
+  "source_evidence": {
+    "training_directory": "outputs/grpo_qlora_48g_domain_v1",
+    "evaluation_directory": "outputs/evaluation/grpo_qlora_48g_domain_v1_internal_v1",
+    "artifact_audit": "outputs/evaluation/grpo_qlora_48g_domain_v1_internal_v1_artifact_audit_v1.json",
+    "sft_to_grpo_paired_report": "outputs/evaluation/sft_internal_v1_to_grpo_internal_v1_paired_v1.json",
+    "base_to_grpo_paired_report": "outputs/evaluation/base_internal_v1_to_grpo_internal_v1_paired_v1.json"
+  },
+  "pending_guardrails": [
+    "ChartQA",
+    "ChartQAPro",
+    "qualitative_failure_review"
+  ]
+}

@@ -122,7 +122,34 @@ class ExperimentRecordTests(unittest.TestCase):
         self.assertTrue(reload_summary["quantized_base"])
         self.assertIn("not a capability result", " ".join(summary["notes"]))
 
-    def test_matrix_points_to_reviewed_summaries_and_keeps_r1_running(self):
+    def test_full_grpo_summary_preserves_attribution_boundary(self):
+        summary = load_json(RESULTS / "20260828_grpo_internal_summary.json")
+        sft_paired = summary["paired_sft_to_grpo"]
+        base_paired = summary["paired_base_to_grpo"]
+
+        self.assertEqual(summary["status"], "passed")
+        self.assertEqual(summary["training"]["global_step"], 3600)
+        self.assertEqual(summary["evaluation"]["rows"], 2496)
+        self.assertEqual(summary["evaluation"]["artifact_audit"], "PASS")
+        self.assertEqual(summary["adapter"]["reload_status"], "PASS")
+
+        for name, values in sft_paired.items():
+            if not isinstance(values, dict) or "candidate_mean" not in values:
+                continue
+            self.assertEqual(values["candidate_mean"], summary["metrics"][name])
+            low, high = values["bootstrap_95_ci"]
+            self.assertLessEqual(low, 0, name)
+            self.assertGreaterEqual(high, 0, name)
+            self.assertEqual(values["verdict"], "INCONCLUSIVE")
+
+        for name, values in base_paired.items():
+            if not isinstance(values, dict) or "candidate_mean" not in values:
+                continue
+            self.assertEqual(values["candidate_mean"], summary["metrics"][name])
+            self.assertGreater(values["bootstrap_95_ci"][0], 0, name)
+            self.assertEqual(values["verdict"], "GRPO_BETTER")
+
+    def test_matrix_points_to_reviewed_summaries_and_closes_r1(self):
         matrix = yaml.safe_load(
             (ROOT / "experiments" / "experiment_matrix.yaml").read_text(
                 encoding="utf-8"
@@ -141,8 +168,14 @@ class ExperimentRecordTests(unittest.TestCase):
         self.assertTrue((ROOT / smoke["evidence"]).is_file())
 
         full_grpo = experiments["R1_grpo_48g_full"]
-        self.assertEqual(full_grpo["status"], "running")
-        self.assertNotIn("result", full_grpo)
+        self.assertEqual(full_grpo["status"], "completed")
+        self.assertTrue((ROOT / full_grpo["evidence"]["summary"]).is_file())
+        self.assertIn("result", full_grpo)
+        self.assertIn("attribution", full_grpo)
+
+        reward_ablation = experiments["R2_reward_ablation"]
+        self.assertEqual(reward_ablation["status"], "not_triggered")
+        self.assertIn("did not establish", reward_ablation["result"])
 
 
 if __name__ == "__main__":
