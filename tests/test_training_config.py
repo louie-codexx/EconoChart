@@ -156,6 +156,7 @@ class TrainingConfigTests(unittest.TestCase):
     def test_formal_and_development_configs_freeze_their_row_counts(self) -> None:
         base = load_config("configs/eval/base_internal.yaml")
         formal = load_config("configs/eval/sft_internal.yaml")
+        grpo = load_config("configs/eval/grpo_internal.yaml")
         development = load_config("configs/eval/development_val_512.yaml")
         self.assertEqual(base["data"]["test"][0]["expected_rows"], 2496)
         self.assertEqual(formal["experiment"]["checkpoint_stage"], "sft")
@@ -163,6 +164,11 @@ class TrainingConfigTests(unittest.TestCase):
         self.assertEqual(formal["data"]["test"], base["data"]["test"])
         self.assertEqual(formal["generation"], base["generation"])
         self.assertEqual(formal["evaluation"]["expected_split"], "test")
+        self.assertEqual(grpo["experiment"]["checkpoint_stage"], "grpo")
+        self.assertEqual(grpo["model"]["adapter_path"], "outputs/grpo_qlora_48g_domain_v1/final_adapter")
+        self.assertEqual(grpo["data"]["test"], formal["data"]["test"])
+        self.assertEqual(grpo["generation"], formal["generation"])
+        self.assertEqual(grpo["evaluation"], formal["evaluation"])
         self.assertEqual(development["evaluation"]["expected_split"], "val")
         self.assertEqual(development["data"]["test"][0]["expected_rows"], 512)
 
