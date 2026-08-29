@@ -157,6 +157,7 @@ def _prepare_chartqa_split(
             ground_truth=_public_ground_truth(answers),
             metadata={
                 "source_index": source_index,
+                "image_sha256": digest,
                 "human_or_machine": (
                     int(source["human_or_machine"]) if source.get("human_or_machine") is not None else -1
                 ),
@@ -165,6 +166,130 @@ def _prepare_chartqa_split(
         )
         records.append(record)
     return records
+
+
+_CHARTQA_SPLITS = ("train", "val", "test")
+_CHARTQA_SPLIT_PAIRS = (("train", "val"), ("train", "test"), ("val", "test"))
+
+
+def _chartqa_image_sha256(row: dict[str, Any]) -> str:
+    metadata = row.get("metadata")
+    if not isinstance(metadata, dict):
+        raise ValueError(f"ChartQA record {row.get('id', '<unknown>')} has no metadata mapping")
+    digest = metadata.get("image_sha256")
+    if not isinstance(digest, str) or len(digest) != 64:
+        raise ValueError(f"ChartQA record {row.get('id', '<unknown>')} has no full image SHA256")
+    try:
+        int(digest, 16)
+    except ValueError as exc:
+        raise ValueError(
+            f"ChartQA record {row.get('id', '<unknown>')} has an invalid image SHA256"
+        ) from exc
+    return digest.lower()
+
+
+def _chartqa_overlap_hashes(
+    rows_by_split: dict[str, list[dict[str, Any]]],
+) -> dict[str, list[str]]:
+    hashes_by_split = {
+        split: {_chartqa_image_sha256(row) for row in rows_by_split[split]}
+        for split in _CHARTQA_SPLITS
+    }
+    return {
+        f"{left}_{right}": sorted(hashes_by_split[left] & hashes_by_split[right])
+        for left, right in _CHARTQA_SPLIT_PAIRS
+    }
+
+
+def _decontaminate_chartqa_rows(
+    rows_by_split: dict[str, list[dict[str, Any]]],
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
+    missing_splits = [split for split in _CHARTQA_SPLITS if split not in rows_by_split]
+    if missing_splits:
+        raise ValueError(f"ChartQA rows are missing required splits: {missing_splits}")
+
+    cleaned = {split: list(rows_by_split[split]) for split in _CHARTQA_SPLITS}
+    before_records = {split: len(cleaned[split]) for split in _CHARTQA_SPLITS}
+    initial_overlap_hashes = _chartqa_overlap_hashes(cleaned)
+    if initial_overlap_hashes["val_test"]:
+        raise ValueError(
+            "ChartQA fixed validation/test splits share "
+            f"{len(initial_overlap_hashes['val_test'])} image hashes"
+        )
+
+    validation_hashes = {_chartqa_image_sha256(row) for row in cleaned["val"]}
+    test_hashes = {_chartqa_image_sha256(row) for row in cleaned["test"]}
+    evaluation_hashes = validation_hashes | test_hashes
+    kept_train: list[dict[str, Any]] = []
+    removed_train_records: list[dict[str, Any]] = []
+    for row in cleaned["train"]:
+        digest = _chartqa_image_sha256(row)
+        if digest not in evaluation_hashes:
+            kept_train.append(row)
+            continue
+        metadata = row["metadata"]
+        overlaps_with = []
+        if digest in validation_hashes:
+            overlaps_with.append("val")
+        if digest in test_hashes:
+            overlaps_with.append("test")
+        removed_train_records.append(
+            {
+                "id": row.get("id"),
+                "source_index": metadata.get("source_index"),
+                "image_sha256": digest,
+                "overlaps_with": overlaps_with,
+            }
+        )
+    cleaned["train"] = kept_train
+
+    final_overlap_hashes = _chartqa_overlap_hashes(cleaned)
+    if any(final_overlap_hashes.values()):
+        raise RuntimeError(f"ChartQA split decontamination failed: {final_overlap_hashes}")
+
+    audit = {
+        "policy": "preserve_fixed_val_test_remove_overlaps_from_optional_train",
+        "reason": "Prevent cross-split image leakage while preserving frozen evaluation splits.",
+        "training_cap_refilled": False,
+        "before_records": before_records,
+        "after_records": {split: len(cleaned[split]) for split in _CHARTQA_SPLITS},
+        "initial_overlap_counts": {
+            pair: len(hashes) for pair, hashes in initial_overlap_hashes.items()
+        },
+        "final_overlap_counts": {
+            pair: len(hashes) for pair, hashes in final_overlap_hashes.items()
+        },
+        "initial_overlap_hashes": initial_overlap_hashes,
+        "final_overlap_hashes": final_overlap_hashes,
+        "removed_train_records": removed_train_records,
+        "removed_train_record_ids": [row["id"] for row in removed_train_records],
+        "removed_image_sha256": sorted(
+            {row["image_sha256"] for row in removed_train_records}
+        ),
+    }
+    return cleaned, audit
+
+
+def _remove_unreferenced_chartqa_train_images(
+    output_root: Path,
+    train_rows: list[dict[str, Any]],
+) -> list[str]:
+    images_dir = (output_root / "images" / "train").resolve()
+    resolved_output_root = output_root.resolve()
+    if resolved_output_root not in images_dir.parents:
+        raise ValueError(f"ChartQA train image directory escapes output root: {images_dir}")
+    if not images_dir.is_dir():
+        return []
+
+    referenced = {(ROOT / str(row["image"])).resolve() for row in train_rows}
+    removed: list[str] = []
+    for path in sorted(images_dir.glob("*.png")):
+        resolved = path.resolve()
+        if images_dir not in resolved.parents or resolved in referenced:
+            continue
+        path.unlink()
+        removed.append(path.relative_to(ROOT).as_posix())
+    return removed
 
 
 def prepare_chartqa(config: dict[str, Any], *, overwrite: bool = False) -> dict[str, Any]:
@@ -179,26 +304,30 @@ def prepare_chartqa(config: dict[str, Any], *, overwrite: bool = False) -> dict[
     dataset_id = dataset_config.get("dataset_id", source["dataset_id"])
     counts: dict[str, int] = {}
     hashes: dict[str, str] = {}
-    chart_ids_by_split: dict[str, set[str]] = {}
+    rows_by_split: dict[str, list[dict[str, Any]]] = {}
     for split in source["splits"]:
         dataset = load_dataset(dataset_id, split=split)
         limit = limits.get(split)
-        rows = _prepare_chartqa_split(dataset, split, output_root, seed=seed, limit=limit)
-        chart_ids_by_split[split] = {row["chart_id"] for row in rows}
+        rows_by_split[split] = _prepare_chartqa_split(
+            dataset, split, output_root, seed=seed, limit=limit
+        )
+
+    rows_by_split, split_decontamination = _decontaminate_chartqa_rows(rows_by_split)
+    split_decontamination["removed_train_image_files"] = (
+        _remove_unreferenced_chartqa_train_images(output_root, rows_by_split["train"])
+    )
+    for split in source["splits"]:
         path = output_root / "annotations" / f"{split}.jsonl"
-        counts[split] = write_jsonl(path, rows)
+        counts[split] = write_jsonl(path, rows_by_split[split])
         hashes[f"annotations/{split}.jsonl"] = sha256_file(path)
         print(f"Prepared ChartQA {split}: {counts[split]} records")
-    for left, right in (("train", "val"), ("train", "test"), ("val", "test")):
-        overlap = chart_ids_by_split[left] & chart_ids_by_split[right]
-        if overlap:
-            raise ValueError(f"ChartQA source contains {len(overlap)} image hashes shared by {left}/{right}")
     manifest = {
         "dataset": "chartqa",
         "source": {**source, "dataset_id": dataset_id},
         "seed": seed,
         "records": counts,
         "checksums": hashes,
+        "split_decontamination": split_decontamination,
         "role": "optional SFT mixture (train/val) and fixed external benchmark (test)",
     }
     write_json(output_root / "manifest.json", manifest)

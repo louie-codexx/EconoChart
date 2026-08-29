@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from econochart.config import ROOT
 from econochart.data.cleanup_legacy import _validated_target
 from econochart.data.generator import generate_companies
-from econochart.data.public import _chartqapro_example
+from econochart.data.public import (
+    _chartqapro_example,
+    _decontaminate_chartqa_rows,
+    _remove_unreferenced_chartqa_train_images,
+)
 from econochart.data.schema import validate_record
 from econochart.data.subsets import select_grpo_records, select_sft_records, select_validation_records
 from econochart.data.training import make_grpo_example, make_sft_example
@@ -16,6 +22,14 @@ from econochart.io import read_jsonl
 
 
 class DataPipelineTests(unittest.TestCase):
+    @staticmethod
+    def _chartqa_row(record_id: str, split: str, digest: str, source_index: int) -> dict:
+        return {
+            "id": record_id,
+            "split": split,
+            "metadata": {"image_sha256": digest, "source_index": source_index},
+        }
+
     def test_generation_is_deterministic_and_coherent(self) -> None:
         first = generate_companies(192, seed=20260821)
         second = generate_companies(192, seed=20260821)
@@ -69,6 +83,110 @@ class DataPipelineTests(unittest.TestCase):
         self.assertEqual(answer, "A is twice B")
         self.assertEqual(answers, ["10", "A is twice B"])
         self.assertEqual(years, ["NO", "NO"])
+
+    def test_chartqa_decontamination_preserves_eval_splits_and_does_not_refill(self) -> None:
+        shared = "1" * 64
+        train_only = "2" * 64
+        val_only = "3" * 64
+        test_only = "4" * 64
+        train_test_shared = "5" * 64
+        rows = {
+            "train": [
+                self._chartqa_row("train-shared-a", "train", shared, 1),
+                self._chartqa_row("train-only", "train", train_only, 2),
+                self._chartqa_row("train-shared-b", "train", shared, 3),
+                self._chartqa_row("train-test-shared", "train", train_test_shared, 4),
+            ],
+            "val": [
+                self._chartqa_row("val-shared", "val", shared, 5),
+                self._chartqa_row("val-only", "val", val_only, 6),
+            ],
+            "test": [
+                self._chartqa_row("test-only", "test", test_only, 7),
+                self._chartqa_row("test-shared", "test", train_test_shared, 8),
+            ],
+        }
+
+        cleaned, audit = _decontaminate_chartqa_rows(rows)
+
+        self.assertEqual([row["id"] for row in cleaned["train"]], ["train-only"])
+        self.assertEqual(cleaned["val"], rows["val"])
+        self.assertEqual(cleaned["test"], rows["test"])
+        self.assertFalse(audit["training_cap_refilled"])
+        self.assertEqual(audit["before_records"], {"train": 4, "val": 2, "test": 2})
+        self.assertEqual(audit["after_records"], {"train": 1, "val": 2, "test": 2})
+        self.assertEqual(audit["initial_overlap_counts"]["train_val"], 1)
+        self.assertEqual(audit["initial_overlap_counts"]["train_test"], 1)
+        self.assertEqual(audit["final_overlap_counts"], {
+            "train_val": 0,
+            "train_test": 0,
+            "val_test": 0,
+        })
+        self.assertEqual(
+            audit["removed_train_record_ids"],
+            ["train-shared-a", "train-shared-b", "train-test-shared"],
+        )
+        self.assertEqual(audit["removed_image_sha256"], [shared, train_test_shared])
+        self.assertEqual(
+            [row["overlaps_with"] for row in audit["removed_train_records"]],
+            [["val"], ["val"], ["test"]],
+        )
+
+    def test_chartqa_decontamination_rejects_fixed_eval_overlap(self) -> None:
+        shared = "a" * 64
+        rows = {
+            "train": [],
+            "val": [self._chartqa_row("val-shared", "val", shared, 1)],
+            "test": [self._chartqa_row("test-shared", "test", shared, 2)],
+        }
+        with self.assertRaisesRegex(ValueError, "fixed validation/test"):
+            _decontaminate_chartqa_rows(rows)
+
+    def test_chartqa_decontamination_uses_full_hash_not_short_chart_id(self) -> None:
+        common_prefix = "b" * 16
+        rows = {
+            "train": [
+                self._chartqa_row("train", "train", common_prefix + "1" * 48, 1)
+            ],
+            "val": [self._chartqa_row("val", "val", common_prefix + "2" * 48, 2)],
+            "test": [],
+        }
+
+        cleaned, audit = _decontaminate_chartqa_rows(rows)
+
+        self.assertEqual(cleaned, rows)
+        self.assertEqual(audit["removed_train_records"], [])
+        self.assertTrue(all(count == 0 for count in audit["final_overlap_counts"].values()))
+
+    def test_chartqa_train_image_cleanup_removes_only_unreferenced_pngs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temporary_root = Path(temp_dir)
+            output_root = temporary_root / "data" / "generated" / "public" / "chartqa"
+            train_images = output_root / "images" / "train"
+            val_images = output_root / "images" / "val"
+            train_images.mkdir(parents=True)
+            val_images.mkdir(parents=True)
+            kept_image = train_images / "kept.png"
+            removed_image = train_images / "removed.png"
+            unrelated_file = train_images / "notes.txt"
+            val_image = val_images / "fixed.png"
+            kept_image.write_bytes(b"kept")
+            removed_image.write_bytes(b"removed")
+            unrelated_file.write_text("keep", encoding="utf-8")
+            val_image.write_bytes(b"fixed")
+            train_rows = [{"image": kept_image.relative_to(temporary_root).as_posix()}]
+
+            with patch("econochart.data.public.ROOT", temporary_root):
+                removed = _remove_unreferenced_chartqa_train_images(output_root, train_rows)
+
+            self.assertEqual(
+                removed,
+                [removed_image.relative_to(temporary_root).as_posix()],
+            )
+            self.assertTrue(kept_image.is_file())
+            self.assertFalse(removed_image.exists())
+            self.assertTrue(unrelated_file.is_file())
+            self.assertTrue(val_image.is_file())
 
     def test_manifest_checksums_are_present(self) -> None:
         manifest = json.loads(
