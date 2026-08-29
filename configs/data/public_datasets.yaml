@@ -6,7 +6,8 @@ public:
     dataset_id: HuggingFaceM4/ChartQA
     output_root: data/generated/public/chartqa
     # The default mixture uses an 8k deterministic training subset so the
-    # domain data remains the majority. Validation and test stay complete.
+    # domain data remains the majority. Test stays complete; validation rows
+    # sharing an image with test are removed deterministically without refill.
     max_samples:
       train: 8000
       val: null

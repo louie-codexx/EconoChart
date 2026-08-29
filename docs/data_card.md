@@ -93,7 +93,7 @@ SFT 优先保留全部图片和企业覆盖、减少同一图的重复问题；G
 
 本仓库不重新分发公开数据。准备代码从官方 Hugging Face 数据源读取并在本地生成统一 annotation。ChartQAPro 的多轮样本保留历史问答作为上下文，只预测最后一轮，并导出官方评测格式。
 
-ChartQA 准备阶段按规范化 PNG 的完整 SHA-256 检查跨 split 图像重复。val/test 保持固定；与它们冲突的记录只从可选 train 中删除且不回填。如果 val 与 test 彼此重叠，构建会直接失败。删除前后数量、冲突哈希、样本 ID 和最终零重叠检查写入 `manifest.json` 的 `split_decontamination`。
+ChartQA 准备阶段按规范化 PNG 的完整 SHA-256 检查跨 split 图像重复。固定外部 test 完整保留；先从 validation 删除与 test 同图的全部问答，再从可选 train 删除与清理后 validation 或 test 同图的全部问答，两个可变 split 均不回填。删除前后数量、冲突哈希、分 split 样本 ID、未引用图片文件和最终零重叠检查写入 `manifest.json` 的 `split_decontamination`。
 
 如果发布混合训练后的 adapter 或派生数据，应在发布前重新核对数据集条款与目标平台要求；本数据卡不是法律意见。
 

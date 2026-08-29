@@ -12,7 +12,7 @@ from econochart.data.generator import generate_companies
 from econochart.data.public import (
     _chartqapro_example,
     _decontaminate_chartqa_rows,
-    _remove_unreferenced_chartqa_train_images,
+    _remove_unreferenced_chartqa_split_images,
 )
 from econochart.data.schema import validate_record
 from econochart.data.subsets import select_grpo_records, select_sft_records, select_validation_records
@@ -84,63 +84,94 @@ class DataPipelineTests(unittest.TestCase):
         self.assertEqual(answers, ["10", "A is twice B"])
         self.assertEqual(years, ["NO", "NO"])
 
-    def test_chartqa_decontamination_preserves_eval_splits_and_does_not_refill(self) -> None:
+    def test_chartqa_decontamination_preserves_test_and_does_not_refill(self) -> None:
         shared = "1" * 64
         train_only = "2" * 64
         val_only = "3" * 64
         test_only = "4" * 64
         train_test_shared = "5" * 64
+        val_test_shared = "6" * 64
         rows = {
             "train": [
                 self._chartqa_row("train-shared-a", "train", shared, 1),
                 self._chartqa_row("train-only", "train", train_only, 2),
                 self._chartqa_row("train-shared-b", "train", shared, 3),
                 self._chartqa_row("train-test-shared", "train", train_test_shared, 4),
+                self._chartqa_row("train-val-test-shared", "train", val_test_shared, 5),
             ],
             "val": [
-                self._chartqa_row("val-shared", "val", shared, 5),
-                self._chartqa_row("val-only", "val", val_only, 6),
+                self._chartqa_row("val-shared", "val", shared, 6),
+                self._chartqa_row("val-only", "val", val_only, 7),
+                self._chartqa_row("val-test-shared", "val", val_test_shared, 8),
             ],
             "test": [
-                self._chartqa_row("test-only", "test", test_only, 7),
-                self._chartqa_row("test-shared", "test", train_test_shared, 8),
+                self._chartqa_row("test-only", "test", test_only, 9),
+                self._chartqa_row("test-shared", "test", train_test_shared, 10),
+                self._chartqa_row("test-val-shared", "test", val_test_shared, 11),
             ],
         }
 
         cleaned, audit = _decontaminate_chartqa_rows(rows)
 
         self.assertEqual([row["id"] for row in cleaned["train"]], ["train-only"])
-        self.assertEqual(cleaned["val"], rows["val"])
+        self.assertEqual(
+            [row["id"] for row in cleaned["val"]],
+            ["val-shared", "val-only"],
+        )
         self.assertEqual(cleaned["test"], rows["test"])
+        self.assertFalse(audit["validation_cap_refilled"])
         self.assertFalse(audit["training_cap_refilled"])
-        self.assertEqual(audit["before_records"], {"train": 4, "val": 2, "test": 2})
-        self.assertEqual(audit["after_records"], {"train": 1, "val": 2, "test": 2})
-        self.assertEqual(audit["initial_overlap_counts"]["train_val"], 1)
-        self.assertEqual(audit["initial_overlap_counts"]["train_test"], 1)
+        self.assertEqual(audit["before_records"], {"train": 5, "val": 3, "test": 3})
+        self.assertEqual(audit["after_records"], {"train": 1, "val": 2, "test": 3})
+        self.assertEqual(audit["initial_overlap_counts"]["train_val"], 2)
+        self.assertEqual(audit["initial_overlap_counts"]["train_test"], 2)
+        self.assertEqual(audit["initial_overlap_counts"]["val_test"], 1)
         self.assertEqual(audit["final_overlap_counts"], {
             "train_val": 0,
             "train_test": 0,
             "val_test": 0,
         })
+        self.assertEqual(audit["removed_validation_record_ids"], ["val-test-shared"])
+        self.assertEqual(audit["removed_validation_image_sha256"], [val_test_shared])
         self.assertEqual(
             audit["removed_train_record_ids"],
-            ["train-shared-a", "train-shared-b", "train-test-shared"],
+            [
+                "train-shared-a",
+                "train-shared-b",
+                "train-test-shared",
+                "train-val-test-shared",
+            ],
         )
-        self.assertEqual(audit["removed_image_sha256"], [shared, train_test_shared])
+        self.assertEqual(
+            audit["removed_train_image_sha256"],
+            [shared, train_test_shared, val_test_shared],
+        )
         self.assertEqual(
             [row["overlaps_with"] for row in audit["removed_train_records"]],
-            [["val"], ["val"], ["test"]],
+            [["val"], ["val"], ["test"], ["test"]],
         )
 
-    def test_chartqa_decontamination_rejects_fixed_eval_overlap(self) -> None:
+    def test_chartqa_decontamination_removes_all_validation_rows_shared_with_test(self) -> None:
         shared = "a" * 64
         rows = {
             "train": [],
-            "val": [self._chartqa_row("val-shared", "val", shared, 1)],
-            "test": [self._chartqa_row("test-shared", "test", shared, 2)],
+            "val": [
+                self._chartqa_row("val-shared-a", "val", shared, 1),
+                self._chartqa_row("val-shared-b", "val", shared, 2),
+            ],
+            "test": [self._chartqa_row("test-shared", "test", shared, 3)],
         }
-        with self.assertRaisesRegex(ValueError, "fixed validation/test"):
-            _decontaminate_chartqa_rows(rows)
+
+        cleaned, audit = _decontaminate_chartqa_rows(rows)
+
+        self.assertEqual(cleaned["val"], [])
+        self.assertEqual(cleaned["test"], rows["test"])
+        self.assertEqual(
+            audit["removed_validation_record_ids"],
+            ["val-shared-a", "val-shared-b"],
+        )
+        self.assertEqual(audit["removed_validation_image_sha256"], [shared])
+        self.assertTrue(all(count == 0 for count in audit["final_overlap_counts"].values()))
 
     def test_chartqa_decontamination_uses_full_hash_not_short_chart_id(self) -> None:
         common_prefix = "b" * 16
@@ -158,35 +189,60 @@ class DataPipelineTests(unittest.TestCase):
         self.assertEqual(audit["removed_train_records"], [])
         self.assertTrue(all(count == 0 for count in audit["final_overlap_counts"].values()))
 
-    def test_chartqa_train_image_cleanup_removes_only_unreferenced_pngs(self) -> None:
+    def test_chartqa_image_cleanup_is_limited_to_requested_mutable_split(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temporary_root = Path(temp_dir)
             output_root = temporary_root / "data" / "generated" / "public" / "chartqa"
             train_images = output_root / "images" / "train"
             val_images = output_root / "images" / "val"
+            test_images = output_root / "images" / "test"
             train_images.mkdir(parents=True)
             val_images.mkdir(parents=True)
+            test_images.mkdir(parents=True)
             kept_image = train_images / "kept.png"
             removed_image = train_images / "removed.png"
             unrelated_file = train_images / "notes.txt"
-            val_image = val_images / "fixed.png"
+            kept_val_image = val_images / "kept.png"
+            removed_val_image = val_images / "removed.png"
+            test_image = test_images / "fixed.png"
             kept_image.write_bytes(b"kept")
             removed_image.write_bytes(b"removed")
             unrelated_file.write_text("keep", encoding="utf-8")
-            val_image.write_bytes(b"fixed")
+            kept_val_image.write_bytes(b"kept val")
+            removed_val_image.write_bytes(b"removed val")
+            test_image.write_bytes(b"fixed")
             train_rows = [{"image": kept_image.relative_to(temporary_root).as_posix()}]
+            val_rows = [{"image": kept_val_image.relative_to(temporary_root).as_posix()}]
 
             with patch("econochart.data.public.ROOT", temporary_root):
-                removed = _remove_unreferenced_chartqa_train_images(output_root, train_rows)
+                removed_train = _remove_unreferenced_chartqa_split_images(
+                    output_root,
+                    "train",
+                    train_rows,
+                )
+                removed_validation = _remove_unreferenced_chartqa_split_images(
+                    output_root,
+                    "val",
+                    val_rows,
+                )
 
             self.assertEqual(
-                removed,
+                removed_train,
                 [removed_image.relative_to(temporary_root).as_posix()],
+            )
+            self.assertEqual(
+                removed_validation,
+                [removed_val_image.relative_to(temporary_root).as_posix()],
             )
             self.assertTrue(kept_image.is_file())
             self.assertFalse(removed_image.exists())
             self.assertTrue(unrelated_file.is_file())
-            self.assertTrue(val_image.is_file())
+            self.assertTrue(kept_val_image.is_file())
+            self.assertFalse(removed_val_image.exists())
+            self.assertTrue(test_image.is_file())
+
+            with self.assertRaisesRegex(ValueError, "only supports mutable splits"):
+                _remove_unreferenced_chartqa_split_images(output_root, "test", [])
 
     def test_manifest_checksums_are_present(self) -> None:
         manifest = json.loads(

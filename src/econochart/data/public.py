@@ -169,6 +169,7 @@ def _prepare_chartqa_split(
 
 
 _CHARTQA_SPLITS = ("train", "val", "test")
+_CHARTQA_MUTABLE_SPLITS = ("train", "val")
 _CHARTQA_SPLIT_PAIRS = (("train", "val"), ("train", "test"), ("val", "test"))
 
 
@@ -201,6 +202,16 @@ def _chartqa_overlap_hashes(
     }
 
 
+def _chartqa_removed_record(row: dict[str, Any], *, overlaps_with: list[str]) -> dict[str, Any]:
+    metadata = row["metadata"]
+    return {
+        "id": row.get("id"),
+        "source_index": metadata.get("source_index"),
+        "image_sha256": _chartqa_image_sha256(row),
+        "overlaps_with": overlaps_with,
+    }
+
+
 def _decontaminate_chartqa_rows(
     rows_by_split: dict[str, list[dict[str, Any]]],
 ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
@@ -211,14 +222,21 @@ def _decontaminate_chartqa_rows(
     cleaned = {split: list(rows_by_split[split]) for split in _CHARTQA_SPLITS}
     before_records = {split: len(cleaned[split]) for split in _CHARTQA_SPLITS}
     initial_overlap_hashes = _chartqa_overlap_hashes(cleaned)
-    if initial_overlap_hashes["val_test"]:
-        raise ValueError(
-            "ChartQA fixed validation/test splits share "
-            f"{len(initial_overlap_hashes['val_test'])} image hashes"
+
+    test_hashes = {_chartqa_image_sha256(row) for row in cleaned["test"]}
+    kept_validation: list[dict[str, Any]] = []
+    removed_validation_records: list[dict[str, Any]] = []
+    for row in cleaned["val"]:
+        digest = _chartqa_image_sha256(row)
+        if digest not in test_hashes:
+            kept_validation.append(row)
+            continue
+        removed_validation_records.append(
+            _chartqa_removed_record(row, overlaps_with=["test"])
         )
+    cleaned["val"] = kept_validation
 
     validation_hashes = {_chartqa_image_sha256(row) for row in cleaned["val"]}
-    test_hashes = {_chartqa_image_sha256(row) for row in cleaned["test"]}
     evaluation_hashes = validation_hashes | test_hashes
     kept_train: list[dict[str, Any]] = []
     removed_train_records: list[dict[str, Any]] = []
@@ -227,19 +245,13 @@ def _decontaminate_chartqa_rows(
         if digest not in evaluation_hashes:
             kept_train.append(row)
             continue
-        metadata = row["metadata"]
         overlaps_with = []
         if digest in validation_hashes:
             overlaps_with.append("val")
         if digest in test_hashes:
             overlaps_with.append("test")
         removed_train_records.append(
-            {
-                "id": row.get("id"),
-                "source_index": metadata.get("source_index"),
-                "image_sha256": digest,
-                "overlaps_with": overlaps_with,
-            }
+            _chartqa_removed_record(row, overlaps_with=overlaps_with)
         )
     cleaned["train"] = kept_train
 
@@ -248,8 +260,13 @@ def _decontaminate_chartqa_rows(
         raise RuntimeError(f"ChartQA split decontamination failed: {final_overlap_hashes}")
 
     audit = {
-        "policy": "preserve_fixed_val_test_remove_overlaps_from_optional_train",
-        "reason": "Prevent cross-split image leakage while preserving frozen evaluation splits.",
+        "policy": "preserve_fixed_test_remove_conflicts_from_validation_then_train",
+        "reason": (
+            "Prevent cross-split image leakage while preserving the fixed external test benchmark."
+        ),
+        "protected_split": "test",
+        "mutable_splits": list(_CHARTQA_MUTABLE_SPLITS),
+        "validation_cap_refilled": False,
         "training_cap_refilled": False,
         "before_records": before_records,
         "after_records": {split: len(cleaned[split]) for split in _CHARTQA_SPLITS},
@@ -261,27 +278,35 @@ def _decontaminate_chartqa_rows(
         },
         "initial_overlap_hashes": initial_overlap_hashes,
         "final_overlap_hashes": final_overlap_hashes,
+        "removed_validation_records": removed_validation_records,
+        "removed_validation_record_ids": [row["id"] for row in removed_validation_records],
+        "removed_validation_image_sha256": sorted(
+            {row["image_sha256"] for row in removed_validation_records}
+        ),
         "removed_train_records": removed_train_records,
         "removed_train_record_ids": [row["id"] for row in removed_train_records],
-        "removed_image_sha256": sorted(
+        "removed_train_image_sha256": sorted(
             {row["image_sha256"] for row in removed_train_records}
         ),
     }
     return cleaned, audit
 
 
-def _remove_unreferenced_chartqa_train_images(
+def _remove_unreferenced_chartqa_split_images(
     output_root: Path,
-    train_rows: list[dict[str, Any]],
+    split: str,
+    rows: list[dict[str, Any]],
 ) -> list[str]:
-    images_dir = (output_root / "images" / "train").resolve()
+    if split not in _CHARTQA_MUTABLE_SPLITS:
+        raise ValueError(f"ChartQA image cleanup only supports mutable splits: {split}")
+    images_dir = (output_root / "images" / split).resolve()
     resolved_output_root = output_root.resolve()
     if resolved_output_root not in images_dir.parents:
-        raise ValueError(f"ChartQA train image directory escapes output root: {images_dir}")
+        raise ValueError(f"ChartQA {split} image directory escapes output root: {images_dir}")
     if not images_dir.is_dir():
         return []
 
-    referenced = {(ROOT / str(row["image"])).resolve() for row in train_rows}
+    referenced = {(ROOT / str(row["image"])).resolve() for row in rows}
     removed: list[str] = []
     for path in sorted(images_dir.glob("*.png")):
         resolved = path.resolve()
@@ -314,7 +339,10 @@ def prepare_chartqa(config: dict[str, Any], *, overwrite: bool = False) -> dict[
 
     rows_by_split, split_decontamination = _decontaminate_chartqa_rows(rows_by_split)
     split_decontamination["removed_train_image_files"] = (
-        _remove_unreferenced_chartqa_train_images(output_root, rows_by_split["train"])
+        _remove_unreferenced_chartqa_split_images(output_root, "train", rows_by_split["train"])
+    )
+    split_decontamination["removed_validation_image_files"] = (
+        _remove_unreferenced_chartqa_split_images(output_root, "val", rows_by_split["val"])
     )
     for split in source["splits"]:
         path = output_root / "annotations" / f"{split}.jsonl"
