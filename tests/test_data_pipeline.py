@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from econochart.config import ROOT
@@ -13,6 +14,7 @@ from econochart.data.public import (
     _chartqapro_example,
     _decontaminate_chartqa_rows,
     _remove_unreferenced_chartqa_split_images,
+    prepare_chartqapro,
 )
 from econochart.data.schema import validate_record
 from econochart.data.subsets import select_grpo_records, select_sft_records, select_validation_records
@@ -83,6 +85,141 @@ class DataPipelineTests(unittest.TestCase):
         self.assertEqual(answer, "A is twice B")
         self.assertEqual(answers, ["10", "A is twice B"])
         self.assertEqual(years, ["NO", "NO"])
+
+    def test_chartqapro_preserves_year_flags_that_are_not_turn_aligned(self) -> None:
+        prompt, answer, answers, years = _chartqapro_example(
+            {
+                "Question": [
+                    "What are the four categories?",
+                    "In which year was the percentage highest?",
+                ],
+                "Answer": ["[# filed, % omitted, % withdrawn, % voted]", "2016"],
+                "Year": ["NO", "YES", "NO", "NO"],
+            }
+        )
+
+        self.assertIn("Assistant: [# filed, % omitted, % withdrawn, % voted]", prompt)
+        self.assertEqual(answer, "2016")
+        self.assertEqual(answers, ["[# filed, % omitted, % withdrawn, % voted]", "2016"])
+        self.assertEqual(years, ["NO", "YES", "NO", "NO"])
+
+    def test_chartqapro_rejects_unpaired_qa_and_invalid_year_flags(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Question/Answer length mismatch"):
+            _chartqapro_example(
+                {
+                    "Question": ["First?", "Second?"],
+                    "Answer": ["only one answer"],
+                    "Year": ["NO"],
+                }
+            )
+        with self.assertRaisesRegex(ValueError, "invalid Year flags"):
+            _chartqapro_example(
+                {
+                    "Question": ["Question?"],
+                    "Answer": ["Answer"],
+                    "Year": ["MAYBE"],
+                }
+            )
+
+    def test_chartqapro_prepare_excludes_empty_final_answers_without_refill(self) -> None:
+        rows = [
+            {
+                "image": "retained-mismatch",
+                "Question": ["First?", "Second?"],
+                "Answer": ["first", "second"],
+                "Year": ["NO", "YES", "NO", "NO"],
+                "Question Type": "Conversational",
+                "Paragraph": "",
+            },
+            {
+                "image": "removed-mismatch",
+                "Question": ["First?", "Second?"],
+                "Answer": ["first", ""],
+                "Year": ["NO"],
+                "Question Type": "Conversational",
+                "Paragraph": "",
+            },
+            {
+                "image": "removed-aligned",
+                "Question": ["First?", "Second?"],
+                "Answer": ["first", ""],
+                "Year": ["NO", "NO"],
+                "Question Type": "Conversational",
+                "Paragraph": "",
+            },
+            {
+                "image": "retained-factoid",
+                "Question": ["Value?"],
+                "Answer": ["42"],
+                "Year": ["NO"],
+                "Question Type": "Factoid",
+                "Paragraph": "context",
+            },
+        ]
+        fake_datasets = SimpleNamespace(load_dataset=lambda *_args, **_kwargs: rows)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temporary_root = Path(temp_dir)
+            output_root = temporary_root / "data" / "generated" / "public" / "chartqapro"
+            config = {
+                "project": {"seed": 20260821},
+                "public": {
+                    "chartqapro": {
+                        "dataset_id": "test/chartqapro",
+                        "output_root": str(output_root),
+                        "max_samples": {"test": None},
+                    }
+                },
+            }
+            save_results = [
+                ("a" * 64, "data/generated/public/chartqapro/images/test/a.png"),
+                ("b" * 64, "data/generated/public/chartqapro/images/test/b.png"),
+            ]
+            with (
+                patch.dict("sys.modules", {"datasets": fake_datasets}),
+                patch("econochart.data.public.ROOT", temporary_root),
+                patch("econochart.data.public._coerce_pil_image", side_effect=lambda image: image),
+                patch("econochart.data.public._save_deduplicated_image", side_effect=save_results) as save_image,
+            ):
+                manifest = prepare_chartqapro(config)
+
+            self.assertEqual(save_image.call_count, 2)
+            self.assertEqual(manifest["selected_source_records"], {"test": 4})
+            self.assertEqual(manifest["records"], {"test": 2})
+            self.assertEqual(manifest["source_question_types"], {"Conversational": 3, "Factoid": 1})
+            self.assertEqual(manifest["question_types"], {"Conversational": 1, "Factoid": 1})
+            self.assertEqual(
+                manifest["source_quality"],
+                {
+                    "policy": (
+                        "preserve raw Year flags; exclude rows with empty final official answers; "
+                        "do not refill"
+                    ),
+                    "before_records": 4,
+                    "after_records": 2,
+                    "removed_empty_final_answer_count": 2,
+                    "removed_empty_final_answer_source_indices": [1, 2],
+                    "removed_empty_final_answer_record_ids": [
+                        "chartqapro_test_00001",
+                        "chartqapro_test_00002",
+                    ],
+                    "year_flag_length_mismatch_count": 2,
+                    "year_flag_length_mismatch_source_indices": [0, 1],
+                    "retained_year_flag_length_mismatch_source_indices": [0],
+                    "cap_refilled": False,
+                },
+            )
+            self.assertEqual(
+                manifest["role"],
+                "fixed evaluable external challenge subset; never used for training or model selection",
+            )
+            written_rows = list(read_jsonl(output_root / "annotations" / "test.jsonl"))
+            self.assertEqual(
+                [row["id"] for row in written_rows],
+                ["chartqapro_test_00000", "chartqapro_test_00003"],
+            )
+            self.assertEqual(written_rows[0]["metadata"]["year_flags"], ["NO", "YES", "NO", "NO"])
+            self.assertTrue(all(validate_record(row) == [] for row in written_rows))
 
     def test_chartqa_decontamination_preserves_test_and_does_not_refill(self) -> None:
         shared = "1" * 64

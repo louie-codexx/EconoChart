@@ -367,17 +367,15 @@ def _chartqapro_example(source: dict[str, Any]) -> tuple[str, str, list[str], li
     answers = _listify(source.get("Answer"))
     if not questions or not answers:
         raise ValueError("ChartQAPro row has no Question/Answer sequence")
-    if len(answers) == 1 and len(questions) > 1:
-        answers = answers * len(questions)
     if len(questions) != len(answers):
         raise ValueError(f"ChartQAPro Question/Answer length mismatch: {len(questions)} vs {len(answers)}")
     years = _listify(source.get("Year"))
     if not years:
-        years = ["NO"] * len(questions)
-    if len(years) == 1 and len(questions) > 1:
-        years = years * len(questions)
-    if len(years) != len(questions):
-        raise ValueError(f"ChartQAPro Question/Year length mismatch: {len(questions)} vs {len(years)}")
+        raise ValueError("ChartQAPro row has no Year sequence")
+    normalized_year_flags = {value.strip().upper() for value in years}
+    invalid_year_flags = sorted(normalized_year_flags - {"YES", "NO"})
+    if invalid_year_flags:
+        raise ValueError(f"ChartQAPro row has invalid Year flags: {invalid_year_flags}")
 
     history = [
         f"User: {question.strip()}\nAssistant: {answer.strip()}"
@@ -404,21 +402,38 @@ def prepare_chartqapro(config: dict[str, Any], *, overwrite: bool = False) -> di
 
     records: list[dict[str, Any]] = []
     images_dir = output_root / "images" / "test"
+    source_type_counts: Counter[str] = Counter()
     type_counts: Counter[str] = Counter()
+    removed_empty_final_answer_source_indices: list[int] = []
+    removed_empty_final_answer_record_ids: list[str] = []
+    year_flag_length_mismatch_source_indices: list[int] = []
+    retained_year_flag_length_mismatch_source_indices: list[int] = []
     for source_index in source_indices:
         source = dataset[source_index]
+        question, answer, answer_sequence, year_flags = _chartqapro_example(source)
+        question_type = str(source.get("Question Type", "unknown"))
+        source_type_counts[question_type] += 1
+        year_flag_length_mismatch = len(year_flags) != len(answer_sequence)
+        if year_flag_length_mismatch:
+            year_flag_length_mismatch_source_indices.append(source_index)
+        record_id = f"chartqapro_test_{source_index:05d}"
+        if not answer:
+            removed_empty_final_answer_source_indices.append(source_index)
+            removed_empty_final_answer_record_ids.append(record_id)
+            continue
+        if year_flag_length_mismatch:
+            retained_year_flag_length_mismatch_source_indices.append(source_index)
+
         image = _coerce_pil_image(source["image"])
         digest, image_path = _save_deduplicated_image(image, images_dir)
         chart_id = f"chartqapro_{digest[:16]}"
         paragraph = source.get("Paragraph")
         paragraph_text = str(paragraph).strip() if paragraph not in (None, "", []) else ""
-        question, answer, answer_sequence, year_flags = _chartqapro_example(source)
         prompt = f"Context: {paragraph_text}\nQuestion: {question}" if paragraph_text else question
-        question_type = str(source.get("Question Type", "unknown"))
         type_counts[question_type] += 1
         records.append(
             make_record(
-                record_id=f"chartqapro_test_{source_index:05d}",
+                record_id=record_id,
                 dataset="chartqapro",
                 split="test",
                 entity_id=chart_id,
@@ -440,16 +455,34 @@ def prepare_chartqapro(config: dict[str, Any], *, overwrite: bool = False) -> di
                 },
             )
         )
+    if len(records) + len(removed_empty_final_answer_source_indices) != len(source_indices):
+        raise AssertionError("ChartQAPro source-quality accounting does not reconcile")
     path = output_root / "annotations" / "test.jsonl"
     write_jsonl(path, records)
     manifest = {
         "dataset": "chartqapro",
         "source": {**source_config, "dataset_id": dataset_id},
         "seed": seed,
+        "selected_source_records": {"test": len(source_indices)},
         "records": {"test": len(records)},
+        "source_question_types": dict(sorted(source_type_counts.items())),
         "question_types": dict(sorted(type_counts.items())),
         "checksums": {"annotations/test.jsonl": sha256_file(path)},
-        "role": "fixed external challenge benchmark only; never used for training or model selection",
+        "source_quality": {
+            "policy": "preserve raw Year flags; exclude rows with empty final official answers; do not refill",
+            "before_records": len(source_indices),
+            "after_records": len(records),
+            "removed_empty_final_answer_count": len(removed_empty_final_answer_source_indices),
+            "removed_empty_final_answer_source_indices": removed_empty_final_answer_source_indices,
+            "removed_empty_final_answer_record_ids": removed_empty_final_answer_record_ids,
+            "year_flag_length_mismatch_count": len(year_flag_length_mismatch_source_indices),
+            "year_flag_length_mismatch_source_indices": year_flag_length_mismatch_source_indices,
+            "retained_year_flag_length_mismatch_source_indices": (
+                retained_year_flag_length_mismatch_source_indices
+            ),
+            "cap_refilled": False,
+        },
+        "role": "fixed evaluable external challenge subset; never used for training or model selection",
     }
     write_json(output_root / "manifest.json", manifest)
     print(f"Prepared ChartQAPro test: {len(records)} records")

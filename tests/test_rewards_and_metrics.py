@@ -11,6 +11,7 @@ from econochart.evaluation.metrics import (
     aggregate_metrics,
     anls,
     chartqapro_accuracy,
+    chartqapro_official_rows,
     relaxed_accuracy,
     score_row,
 )
@@ -93,6 +94,31 @@ class RewardAndMetricTests(unittest.TestCase):
         }
         self.assertEqual(chartqapro_accuracy(row, "2020"), 1.0)
         self.assertEqual(chartqapro_accuracy(row, "2021"), 0.0)
+
+    def test_chartqapro_conversation_scores_with_last_year_flag_and_preserves_raw_export(self) -> None:
+        row = {
+            "dataset": "chartqapro",
+            "answer": "2020",
+            "prediction": "2021",
+            "metadata": {
+                "answer_sequence": ["first", "2020"],
+                "year_flags": ["YES", "YES", "YES", "NO"],
+                "question_type": "Conversational",
+            },
+        }
+
+        self.assertEqual(chartqapro_accuracy(row, row["prediction"]), 1.0)
+        self.assertEqual(
+            chartqapro_official_rows([row]),
+            [
+                {
+                    "Answer": ["first", "2020"],
+                    "Question Type": "Conversational",
+                    "Year": ["YES", "YES", "YES", "NO"],
+                    "prediction": "2021",
+                }
+            ],
+        )
 
     def test_internal_dataset_version_is_scored(self) -> None:
         row = copy.deepcopy(self.rows[0])
