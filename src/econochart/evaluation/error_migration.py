@@ -19,6 +19,7 @@ METRICS = ("exact_match", "relaxed_accuracy")
 STRUCTURED_MARKERS = ("【结论】", "【数据依据】", "【风险】", "【建议】")
 NUMBER_PATTERN = re.compile(r"[-+]?(?:\d+(?:,\d{3})*(?:\.\d+)?|\.\d+)\s*%?")
 CJK_PATTERN = re.compile(r"[\u3400-\u9fff]")
+YEAR_QUESTION_PATTERN = re.compile(r"\b(?:year|when)\b|年份|哪年|何时", re.IGNORECASE)
 
 
 def _to_float(value: Any) -> float | None:
@@ -208,10 +209,47 @@ def _single_numeric_target(row: dict[str, Any]) -> float | None:
     return _to_float(items[0])
 
 
+def _is_year_target(row: dict[str, Any]) -> bool:
+    target = _single_numeric_target(row)
+    if target is None or not target.is_integer() or not 1800 <= target <= 2200:
+        return False
+    metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+    year_flags = [str(value).upper() for value in metadata.get("year_flags", [])]
+    return bool(YEAR_QUESTION_PATTERN.search(str(row.get("question", "")))) or "YES" in year_flags
+
+
+def _single_numeric_token(value: Any) -> float | None:
+    matches = NUMBER_PATTERN.findall(str(value))
+    if len(matches) != 1:
+        return None
+    return _to_float(matches[0])
+
+
+def _percent_scale_ambiguity(row: dict[str, Any], prediction: str) -> bool:
+    target = _single_numeric_target(row)
+    matches = NUMBER_PATTERN.findall(prediction)
+    if target is None or len(matches) != 1 or "%" not in matches[0]:
+        return False
+    raw_text = normalize_answer(matches[0]).replace(",", "").replace("%", "").strip()
+    try:
+        raw_value = float(raw_text)
+    except ValueError:
+        return False
+    return math.isclose(raw_value, target, rel_tol=0, abs_tol=1e-12)
+
+
 def _numeric_relative_error(target: float, prediction: float) -> float:
     if target == 0:
         return 0.0 if prediction == 0 else math.inf
     return abs(prediction - target) / abs(target)
+
+
+def _numeric_error_band(error: float) -> str:
+    if error <= 0.05:
+        return "within_5pct"
+    if error <= 0.10:
+        return "5_to_10pct"
+    return "over_10pct"
 
 
 def _proxy_reason(pair: dict[str, Any], *, max_new_tokens: int) -> str:
@@ -226,19 +264,27 @@ def _proxy_reason(pair: dict[str, Any], *, max_new_tokens: int) -> str:
         return "new_token_cap_proxy_hit"
     if candidate_behavior["structured_markers"] and not baseline_behavior["structured_markers"]:
         return "structured_template_intrusion"
-    if _reference_embedded(row, candidate_prediction):
-        return "reference_embedded_with_extra_format"
     kind = _answer_kind(row)
+    if _reference_embedded(row, candidate_prediction):
+        if kind == "numeric":
+            return "numeric_reference_embedded_with_extra_output"
+        if kind == "text":
+            return "text_reference_embedded_with_extra_output"
+        return "reference_embedded_with_extra_output"
     if kind == "numeric":
+        if _is_year_target(row):
+            return "year_value_or_answer_type_error"
+        if _percent_scale_ambiguity(row, candidate_prediction):
+            return "numeric_percent_scale_ambiguity"
         target = _single_numeric_target(row)
         candidate_value = _to_float(candidate_prediction)
         if target is not None and candidate_value is not None:
             error = _numeric_relative_error(target, candidate_value)
-            if error <= 0.05:
-                return "numeric_within_5pct_but_strict_mismatch"
-            if error <= 0.10:
-                return "numeric_error_5_to_10pct"
-            return "numeric_value_error_over_10pct"
+            return f"numeric_value_error_{_numeric_error_band(error)}"
+        embedded_value = _single_numeric_token(candidate_prediction)
+        if target is not None and embedded_value is not None:
+            error = _numeric_relative_error(target, embedded_value)
+            return f"numeric_unit_or_text_output_{_numeric_error_band(error)}"
         if NUMBER_PATTERN.search(candidate_prediction):
             return "numeric_value_embedded_or_multi_number_error"
         return "numeric_missing_or_non_numeric"
@@ -299,6 +345,8 @@ def _regression_examples(
                 "dataset": row["dataset"],
                 "answer_kind": _answer_kind(row),
                 "question_type": _question_type(row),
+                "year_target": _is_year_target(row),
+                "image": row.get("image"),
                 "question": row["question"],
                 "answer": row["answer"],
                 "baseline_prediction": pair["baseline"].get("prediction", ""),
@@ -310,6 +358,34 @@ def _regression_examples(
             }
         )
     return dict(sorted(reasons.items())), dict(sorted(examples.items()))
+
+
+def _exact_regression_metric_scopes(
+    pairs: list[dict[str, Any]], *, max_new_tokens: int
+) -> tuple[dict[str, int], dict[str, dict[str, int]]]:
+    scopes: Counter[str] = Counter()
+    by_reason: dict[str, Counter[str]] = defaultdict(Counter)
+    for pair in pairs:
+        if float(pair["baseline_scores"]["exact_match"]) <= float(
+            pair["candidate_scores"]["exact_match"]
+        ):
+            continue
+        relaxed_delta = float(pair["candidate_scores"]["relaxed_accuracy"]) - float(
+            pair["baseline_scores"]["relaxed_accuracy"]
+        )
+        if relaxed_delta < -1e-12:
+            scope = "exact_and_relaxed_regression"
+        elif relaxed_delta > 1e-12:
+            scope = "exact_regression_relaxed_improved"
+        else:
+            scope = "exact_only_relaxed_unchanged"
+        reason = _proxy_reason(pair, max_new_tokens=max_new_tokens)
+        scopes[scope] += 1
+        by_reason[reason][scope] += 1
+    return (
+        dict(sorted(scopes.items())),
+        {reason: dict(sorted(values.items())) for reason, values in sorted(by_reason.items())},
+    )
 
 
 def _regression_signatures(pairs: list[dict[str, Any]], *, max_new_tokens: int) -> dict[str, int]:
@@ -393,9 +469,12 @@ def analyze_error_migration(
         max_new_tokens=max_new_tokens,
         examples_per_reason=examples_per_reason,
     )
+    metric_scope_counts, reason_metric_scopes = _exact_regression_metric_scopes(
+        pairs, max_new_tokens=max_new_tokens
+    )
     dataset_counts = Counter(str(pair["baseline"]["dataset"]) for pair in pairs)
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "inputs": {
             "paired_rows": len(pairs),
             "dataset_counts": dict(sorted(dataset_counts.items())),
@@ -413,10 +492,13 @@ def analyze_error_migration(
         },
         "exact_regression_proxy_attribution": {
             "notice": (
-                "Descriptive proxies only. They identify output signatures and do not by themselves prove "
-                "OCR failure or domain overfitting."
+                "Descriptive proxies only. Year, unit, percent, and embedded-reference categories remain "
+                "heuristic and do not by themselves prove semantic correctness, OCR failure, or domain "
+                "overfitting. Primary registered metrics are not changed by this diagnostic."
             ),
             "primary_reason_counts": reason_counts,
+            "metric_scope_counts": metric_scope_counts,
+            "primary_reason_by_metric_scope": reason_metric_scopes,
             "nonexclusive_signature_counts": _regression_signatures(
                 pairs, max_new_tokens=max_new_tokens
             ),
@@ -462,6 +544,19 @@ def _print_summary(report: dict[str, Any], output: str) -> None:
         "EXACT_REGRESSION_SIGNATURES="
         + json.dumps(
             report["exact_regression_proxy_attribution"]["nonexclusive_signature_counts"],
+            sort_keys=True,
+        )
+    )
+    print(
+        "EXACT_REGRESSION_METRIC_SCOPES="
+        + json.dumps(
+            report["exact_regression_proxy_attribution"]["metric_scope_counts"], sort_keys=True
+        )
+    )
+    print(
+        "EXACT_REGRESSION_REASON_BY_SCOPE="
+        + json.dumps(
+            report["exact_regression_proxy_attribution"]["primary_reason_by_metric_scope"],
             sort_keys=True,
         )
     )
