@@ -1,0 +1,151 @@
+{
+  "experiment_id": "sft_qlora_parameter_screen",
+  "checkpoint_stage": "sft_screening",
+  "status": "passed",
+  "seed": 20260821,
+  "source_commit": "953ca23cb20f3d347e049abe7c99d4ada2eead6a",
+  "data": {
+    "train_rows": 4800,
+    "train_sha256": "6418bda45b77d5e63a9a9047d8fba8c10debefad4ec88ccb0d0495318057de8f",
+    "validation_rows": 512,
+    "validation_sha256": "b66302f20129fbd7b0e08b8dae5cba20c39e29c4a83c09e7b3882bcf275ee972",
+    "formal_test_used_for_selection": false
+  },
+  "fixed_controls": {
+    "epochs": 1,
+    "effective_batch_size": 16,
+    "seed": 20260821,
+    "quantization": "NF4 4-bit double quantization",
+    "do_sample": false,
+    "max_new_tokens": 320,
+    "bootstrap_samples": 2000
+  },
+  "learning_rate_candidates_at_rank16": {
+    "5e-5": {
+      "train_loss": 0.381565,
+      "eval_loss": 0.1707,
+      "overall": 0.729235,
+      "numeric": 0.449065,
+      "numeric_recall": 0.42334,
+      "numeric_precision": 0.597176,
+      "trend": 0.894144,
+      "risk": 0.526667,
+      "train_samples_per_second": 0.705
+    },
+    "1e-4": {
+      "train_loss": 0.308024,
+      "eval_loss": 0.155,
+      "overall": 0.745976,
+      "numeric": 0.470874,
+      "numeric_recall": 0.44515,
+      "numeric_precision": 0.613441,
+      "trend": 0.914414,
+      "risk": 0.635556,
+      "hard_overall": 0.696413,
+      "train_samples_per_second": 0.687
+    },
+    "2e-4": {
+      "train_loss": 0.2635,
+      "eval_loss": 0.1458,
+      "overall": 0.766078,
+      "numeric": 0.511338,
+      "numeric_recall": 0.483236,
+      "numeric_precision": 0.634767,
+      "trend": 0.981982,
+      "risk": 0.622222,
+      "hard_overall": 0.721627,
+      "train_samples_per_second": 0.684
+    }
+  },
+  "paired_1e4_to_2e4": {
+    "overall": {"delta": 0.020102, "bootstrap_95_ci": [0.01048, 0.029618]},
+    "numeric": {"delta": 0.040464, "bootstrap_95_ci": [0.021265, 0.058685]},
+    "numeric_recall": {"delta": 0.038086, "bootstrap_95_ci": [0.019857, 0.055664]},
+    "numeric_precision": {"delta": 0.021326, "bootstrap_95_ci": [0.007404, 0.037011]},
+    "trend": {"delta": 0.067568, "bootstrap_95_ci": [0.027027, 0.117117]},
+    "risk": {"delta": -0.013333, "bootstrap_95_ci": [-0.057778, 0.028889]},
+    "hard_overall": {"delta": 0.025214, "bootstrap_95_ci": [0.011667, 0.039747]}
+  },
+  "rank_candidates_at_2e4": {
+    "rank16": {
+      "alpha": 32,
+      "trainable_parameters": 33030144,
+      "adapter_size_mib": 63.142,
+      "train_loss": 0.2635,
+      "eval_loss": 0.1458,
+      "train_runtime_seconds": 7014.28,
+      "train_samples_per_second": 0.684,
+      "overall": 0.766078,
+      "numeric": 0.511338,
+      "numeric_recall": 0.483236,
+      "numeric_precision": 0.634767,
+      "trend": 0.981982,
+      "risk": 0.622222,
+      "hard_overall": 0.721627,
+      "mean_latency_seconds": 5.367425,
+      "median_latency_seconds": 5.476873,
+      "samples_per_second": 0.186309,
+      "mean_completion_tokens": 67.592
+    },
+    "rank8": {
+      "alpha": 16,
+      "trainable_parameters": 16515072,
+      "adapter_size_mib": 31.571,
+      "train_loss": 0.293867441,
+      "eval_loss": 0.152126238,
+      "train_runtime_seconds": 6927.2483,
+      "train_samples_per_second": 0.693,
+      "overall": 0.754333,
+      "numeric": 0.488697,
+      "numeric_recall": 0.462728,
+      "numeric_precision": 0.617697,
+      "trend": 0.945946,
+      "risk": 0.628889,
+      "hard_overall": 0.713554,
+      "mean_latency_seconds": 5.295201,
+      "median_latency_seconds": 5.415432,
+      "samples_per_second": 0.18885,
+      "mean_completion_tokens": 67.496,
+      "predictions_sha256": "c616038bf72cb34288278dc2e0b10db8d3ee18cf8de7ae79c96a0dc028fe20b8"
+    }
+  },
+  "paired_rank8_minus_rank16": {
+    "overall": {"delta": -0.011745, "bootstrap_95_ci": [-0.020636, -0.00201]},
+    "numeric": {"delta": -0.022641, "bootstrap_95_ci": [-0.040293, -0.00242]},
+    "numeric_recall": {"delta": -0.020508, "bootstrap_95_ci": [-0.037923, -0.001457]},
+    "numeric_precision": {"delta": -0.01707, "bootstrap_95_ci": [-0.032137, -0.002633]},
+    "trend": {"delta": -0.036036, "bootstrap_95_ci": [-0.072072, -0.009009]},
+    "risk": {"delta": 0.006667, "bootstrap_95_ci": [-0.037778, 0.053333]},
+    "hard_overall": {"delta": -0.008073, "bootstrap_95_ci": [-0.021186, 0.004469]}
+  },
+  "execution_anomalies": [
+    {
+      "event": "The first rank-8 validation launch wrote 50 rows to a misspelled output directory.",
+      "disposition": "The process was stopped, the 50 rows were excluded, and the correctly named 512-row evaluation was started from zero.",
+      "excluded_rows": 50,
+      "excluded_rows_used_for_selection": false,
+      "comparability_changed": false
+    }
+  ],
+  "source_evidence": {
+    "base_validation_directory": "outputs/evaluation/base_val512_v1",
+    "rank16_lr5e5_validation_directory": "outputs/evaluation/sft_qlora_r16_lr5e5_val512_v1",
+    "rank16_lr1e4_validation_directory": "outputs/evaluation/sft_qlora_r16_lr1e4_val512_v1",
+    "rank16_lr2e4_validation_directory": "outputs/evaluation/sft_qlora_r16_lr2e4_val512_v1",
+    "rank8_lr2e4_training_directory": "outputs/screen/sft_qlora_r8_lr2e4",
+    "rank8_lr2e4_validation_directory": "outputs/evaluation/sft_qlora_r8_lr2e4_val512_v1",
+    "rank8_to_rank16_paired_report": "outputs/evaluation/r16_lr2e4_to_r8_lr2e4_val512_paired_v1.json"
+  },
+  "decision": {
+    "selected_learning_rate": 0.0002,
+    "selected_rank": 16,
+    "selected_alpha": 32,
+    "rank32_triggered": false,
+    "reason": "At fixed rank 16, 2e-4 reliably improved overall, numeric recall and precision, trend, and hard overall over 1e-4 without a reliable risk regression. At 2e-4, rank 16 reliably beat rank 8 on overall and core numeric/trend metrics; rank 8's approximately 50% adapter-size saving did not produce a meaningful end-to-end speed gain."
+  },
+  "interpretation_limits": [
+    "All selection claims use the frozen 512-row validation panel; the 2,496-row formal test was not used.",
+    "The mechanism explanation that rank 8 was capacity-limited is diagnostic rather than a controlled causal proof.",
+    "Rank 32 was not triggered by the completed rank screen. BF16 LoRA and public-data mixing remain conditional and were not run in this screen; their downstream triggers have not all been evaluated while external guardrails are pending."
+  ]
+}

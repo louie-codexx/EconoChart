@@ -84,6 +84,11 @@
     "samples_per_second": 0.217036,
     "mean_completion_tokens": 68.294
   },
+  "memory_observation": {
+    "nvidia_smi_process_mib": 7614,
+    "is_peak": false,
+    "measurement_limit": "Single running-process observation used to verify one trainer process; not a whole-run peak or a Trainer memory delta."
+  },
   "paired_sft_to_grpo": {
     "baseline_rows": 2496,
     "candidate_rows": 2496,

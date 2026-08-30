@@ -23,37 +23,55 @@ experiments:
 
   - id: D1_frozen_training_subsets
     stage: data
-    status: code_ready
+    status: completed
     config: configs/data/training_subsets.yaml
+    evidence: experiments/results/20260822_data_subset_summary.json
     hypothesis: Entity- and chart-aware reduction preserves coverage while removing redundant questions and rollout cost.
     outputs: [sft_screen_4800, sft_train_9600, grpo_train_3600, val_512]
-    decision: Freeze subset hashes before parameter screening or formal training.
+    result: The audited build produced 4,800/9,600/3,600/512 rows with fixed hashes, full training-entity coverage, a nested SFT screen, and zero test rows in the development panel.
+    decision: Subset hashes were frozen before parameter screening and remained unchanged through formal SFT and GRPO.
 
-  - id: B0_base_internal_external
+  - id: B0_base_internal
     stage: baseline
-    status: code_ready
-    configs: [configs/eval/base_internal.yaml, configs/eval/base_external.yaml]
+    status: completed
+    config: configs/eval/base_internal.yaml
+    evidence: experiments/results/20260822_base_internal_summary.json
     hypothesis: The base model's errors identify the true domain and reasoning gaps before adaptation.
-    primary_metrics: [overall, numeric, trend, relaxed_accuracy]
-    decision: Establish the fixed control for every later stage.
+    primary_metrics: [overall, numeric, trend, risk, hard_overall]
+    result: The audited 2,496-row internal baseline scored 0.349780 overall; numeric recall was 0.225027, risk was 0.059233, and 46.234% of outputs hit the token cap.
+    decision: This frozen internal baseline is the control for formal SFT and GRPO comparisons.
+
+  - id: B1_base_external
+    stage: baseline
+    status: in_progress
+    config: configs/eval/base_external.yaml
+    prerequisite: audited ChartQA and ChartQAPro preparation
+    launched_at: 2026-08-30T10:16:07+08:00
+    data_gate: passed with 2,500 fixed ChartQA test rows and 1,946 fixed evaluable ChartQAPro rows
+    progress: Base evaluation was launched; no auditable model result is recorded yet.
+    hypothesis: External chart benchmarks test whether internal synthetic-data gains generalize beyond EconoChart-v2.
+    decision: Keep external claims closed until all Base/SFT/GRPO model evaluations and qualitative guardrails pass.
 
   - id: S0_sft_smoke
     stage: sft
-    status: code_ready
+    status: completed
     config: configs/train/sft_qlora_smoke.yaml
+    evidence: experiments/results/20260822_sft_smoke_summary.json
     hypothesis: The final VLM data/model/QLoRA/collator/save-reload chain works on the target GPU.
-    primary_metrics: [finite_loss, peak_vram_gib, adapter_reload]
-    decision: Gate the full SFT run; not a capability experiment.
+    primary_metrics: [finite_loss, trainer_peak_allocated_delta_gib, adapter_reload]
+    result: Two steps completed with finite train/eval losses; the 504-tensor language-only adapter saved and independently reloaded. Trainer peak allocated delta was 1.813 GiB above its pre-training baseline, not a whole-device peak.
+    decision: The engineering gate passed; no capability claim is made from the smoke loss.
 
   - id: S1_qlora_r16_domain
     stage: sft
     status: completed
     config: configs/train/sft_qlora_4090.yaml
-    control: B0_base_internal_external
+    control: B0_base_internal
     output: outputs/sft_qlora_r16_domain_v1/final_adapter
     evaluation_config: configs/eval/sft_internal.yaml
     evidence:
       training_summary: experiments/results/20260825_sft_training_summary.json
+      screening_summary: experiments/results/20260825_sft_screening_summary.json
       summary: experiments/results/20260826_sft_internal_summary.json
       artifact_audit: outputs/evaluation/sft_qlora_r16_domain_v1_internal_v1_artifact_audit_v1.json
       paired_report: outputs/evaluation/base_internal_v1_to_sft_qlora_r16_domain_v1_internal_v1_paired_v1.json
@@ -84,6 +102,7 @@ experiments:
         - configs/train/sft_qlora_r8_lr2e4_screen.yaml
         - configs/train/sft_qlora_lr2e4_ablation.yaml
     conditional_configs: [configs/train/sft_qlora_r32_ablation.yaml]
+    evidence: experiments/results/20260825_sft_screening_summary.json
     data_budget: 4,800 rows x 1 epoch; compare on the same val_512 IDs.
     single_factor: adapter rank (8/16; run 32 only if 16 is capacity-limited), alpha fixed at 2r
     result: Rank 16 selected at learning rate 2e-4; rank 32 was not triggered because hard/risk evidence did not show residual capacity limitation.
@@ -96,6 +115,7 @@ experiments:
       - configs/train/sft_qlora_lr5e5_ablation.yaml
       - configs/train/sft_qlora_r16_screen.yaml
       - configs/train/sft_qlora_lr2e4_ablation.yaml
+    evidence: experiments/results/20260825_sft_screening_summary.json
     data_budget: 4,800 rows x 1 epoch; compare on the same val_512 IDs.
     single_factor: learning rate (5e-5/1e-4/2e-4)
     fixed_anchor: rank 16, alpha 32
@@ -128,7 +148,7 @@ experiments:
     output: outputs/smoke/grpo_qlora_4090_from_formal_sft_v1/final_adapter
     evidence: experiments/results/20260826_grpo_smoke_summary.json
     hypothesis: Qwen3-VL VLM rollouts and all offline-tested rewards are compatible on 24GB.
-    primary_metrics: [finite_loss, reward_variance, peak_vram_gib, adapter_reload]
+    primary_metrics: [finite_loss, reward_variance, adapter_updates, adapter_reload]
     result: Two optimization steps completed with finite loss; all 504 adapter tensors changed and the saved quantized adapter reloaded successfully.
 
   - id: R1_grpo_48g_full
@@ -142,6 +162,7 @@ experiments:
     launch_environment: RTX 4090 vGPU with 47.37 GiB visible memory
     launch_gate: Preflight passed with 3,600 train rows, 512 eval rows, 4 generations, and effective batch size 4.
     recovery: Resumed from the audited checkpoint-2900 after an AutoDL billing shutdown; upgraded only the Torch runtime for the Transformers security gate and forced UTF-8 for the TRL model-card template. Training objectives and hyperparameters were unchanged.
+    protocol_deviation: R1 was launched after the internal SFT and adapter gates but before the planned external and qualitative guardrails. Treat R1 as an internally audited exploratory run; no external-generalization or final-product claim is allowed until those guardrails close.
     evaluation_config: configs/eval/grpo_internal.yaml
     evidence:
       summary: experiments/results/20260828_grpo_internal_summary.json
@@ -163,4 +184,4 @@ experiments:
     variants: [all_rewards, no_format_or_length, no_numeric, no_trend]
     prerequisite: R1 provides a measurable non-zero effect
     result: R1 did not establish a measurable non-zero SFT-to-GRPO effect on the fixed internal test.
-    decision: Attribute RL gains to capability rewards rather than surface structure.
+    decision: R2 was not run; do not attribute any capability change to individual reward components without the missing prerequisite effect.

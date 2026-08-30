@@ -1,0 +1,66 @@
+{
+  "experiment_id": "base_internal_v1",
+  "checkpoint_stage": "base",
+  "status": "passed",
+  "seed": 20260821,
+  "source_commit": "c8ee009b3b1754097a0e5346b2a0a51ed710f29d",
+  "metric_rescore_commit": "c7ab07eaed63df2277c89866e93775998f151013",
+  "rows": 2496,
+  "model": "Qwen/Qwen3-VL-4B-Instruct",
+  "adapter": null,
+  "generation": {
+    "max_new_tokens": 320,
+    "do_sample": false,
+    "repetition_penalty": 1.0
+  },
+  "integrity": {
+    "git_dirty_at_generation": false,
+    "prediction_rows": 2496,
+    "empty_predictions": 0,
+    "metrics_rescore_after_format_fix": "PASS"
+  },
+  "hashes": {
+    "dataset_manifest_sha256": "a7aba20b3fccd2c3740f3873f327e525bb3b224a5722128b5de52cd1f28f7baa",
+    "test_sha256": "5f4549c793a8484d1803f78e0703103b41ecd97f90789452747d925fcc0dc95"
+  },
+  "metrics": {
+    "overall": 0.34978,
+    "numeric": 0.240061,
+    "numeric_recall": 0.225027,
+    "numeric_precision": 0.63614,
+    "trend": 0.643119,
+    "evidence": 0.767528,
+    "risk": 0.059233,
+    "format": 0.0,
+    "length": 0.848039,
+    "hard_overall": 0.283842
+  },
+  "efficiency": {
+    "mean_latency_seconds": 10.709786,
+    "median_latency_seconds": 14.32325,
+    "samples_per_second": 0.093373,
+    "mean_completion_tokens": 225.611,
+    "token_cap_hits": 1154,
+    "token_cap_hit_rate": 0.46234
+  },
+  "metric_correction": {
+    "old_overall": 0.378755,
+    "old_format": 0.15,
+    "reason": "The old format scorer incorrectly awarded its ordering fraction when no required section was present.",
+    "predictions_regenerated": false,
+    "new_overall": 0.34978,
+    "new_format": 0.0
+  },
+  "conclusion_zh": [
+    "Base 已具备一定趋势识别和证据相关性，但 numeric recall 仅为 0.225027、risk 仅为 0.059233，是后训练的主要能力缺口。",
+    "46.234% 的回答触及 320-token 上限，而参考答案明显更短，说明指令遵循、结构与简洁性同样需要改善。",
+    "该结果是固定内部测试基线，不支持外部分布泛化结论。"
+  ],
+  "source_evidence": {
+    "config": "configs/eval/base_internal.yaml",
+    "evaluation_directory": "outputs/evaluation/base_internal_v1",
+    "predictions": "outputs/evaluation/base_internal_v1/predictions.jsonl",
+    "metrics": "outputs/evaluation/base_internal_v1/metrics.json"
+  },
+  "known_evidence_gap": "The prediction-file SHA-256 was not transcribed into the retained local review record; later paired summaries independently preserve the same 2,496-row baseline means and test hash."
+}

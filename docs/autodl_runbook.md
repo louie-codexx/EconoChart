@@ -81,6 +81,13 @@ econochart-prepare-public \
 
 ChartQA train 只有在“公开数据混合消融”中使用。ChartQA test 与全部 ChartQAPro 永远不进入训练、早停或超参数选择。
 
+公开数据命令退出 0 只是第一层门禁，进入 GPU 外部评测前还必须独立读取 manifest 和 annotation 验收：
+
+- ChartQA：固定 test 行数不变；validation 先删除与 test 同图的记录，train 再删除与清理后 validation/test 同图的记录，均不回填；三个 split 的规范化图片 SHA-256 交集最终为 0，删除 ID 与未引用图片清单可对应。
+- ChartQAPro：核对 selected source 与 evaluable 行数、空最终 `Answer[-1]` 的排除 ID、Year 长度异常记录、annotation/image 一一对应及 hash；空标签不伪造、不回填，Year 元数据不按问答轮数截断。只有这些审计项全部通过，才可把固定可评分子集用于 Base/SFT/GRPO 外部评测。
+
+任一门失败时保留日志和失败目录，修复代码后使用新的 attempt 日志重建；不要把下载完成、缓存回退或 CPU 单测通过写成公开数据门已通过。
+
 ## 4. 保存 base 基线
 
 ```bash

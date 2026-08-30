@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from econochart.config import ConfigError, load_config
 from econochart.evaluation.runner import _load_eval_records
 from econochart.models.loading import trainable_parameter_summary
+from econochart.preflight import REQUIRED_PACKAGES
 from econochart.training.common import validate_grpo_batch
 
 
@@ -39,6 +41,15 @@ class _Model:
 
 
 class TrainingConfigTests(unittest.TestCase):
+    def test_model_runtime_preflight_requires_safe_torch_minimum(self) -> None:
+        for stage in ("sft", "grpo", "eval"):
+            self.assertEqual(REQUIRED_PACKAGES[stage]["torch"], ">=2.6")
+            self.assertEqual(REQUIRED_PACKAGES[stage]["torchvision"], ">=0.21")
+
+        pyproject = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+        self.assertIn('"torch>=2.6"', pyproject)
+        self.assertIn('"torchvision>=0.21"', pyproject)
+
     def test_parameter_summary_restores_packed_4bit_logical_count(self) -> None:
         summary = trainable_parameter_summary(_Model())
         self.assertEqual(summary["trainable_parameters"], 15)

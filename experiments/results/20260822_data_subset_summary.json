@@ -1,0 +1,52 @@
+{
+  "experiment_id": "econochart_v2_training_subsets",
+  "checkpoint_stage": "data",
+  "status": "passed",
+  "seed": 20260821,
+  "source_commit": "4293e67d594744b4c3c104fdebbc71985b877afe",
+  "dataset_manifest_sha256": "a7aba20b3fccd2c3740f3873f327e525bb3b224a5722128b5de52cd1f28f7baa",
+  "subsets": {
+    "sft_screen": {
+      "rows": 4800,
+      "sha256": "6418bda45b77d5e63a9a9047d8fba8c10debefad4ec88ccb0d0495318057de8f",
+      "coverage": "all 2,400 training entities and all 4,800 training charts; one question per chart"
+    },
+    "sft_final": {
+      "rows": 9600,
+      "sha256": "342b451fdbb280aaed59a24a40d1c0ad21a5925ca086749c8d404c89aa535273",
+      "coverage": "all 2,400 training entities and all 4,800 training charts; two questions per chart; contains sft_screen"
+    },
+    "grpo_final": {
+      "rows": 3600,
+      "sha256": "6f4af0445f11b3c627faae5e4f8b8c43780a96c55a6dca9a396e8109640572ce",
+      "coverage": "all 2,400 training entities and 3,600 distinct training charts",
+      "task_quotas": {
+        "numerical_reasoning": 900,
+        "relationship_analysis": 900,
+        "risk_diagnosis": 720,
+        "trend_analysis": 360,
+        "value_retrieval": 720
+      }
+    },
+    "development_val": {
+      "rows": 512,
+      "sha256": "b66302f20129fbd7b0e08b8dae5cba20c39e29c4a83c09e7b3882bcf275ee972",
+      "coverage": "validation split only; zero test rows"
+    }
+  },
+  "integrity": {
+    "build_exit_code": 0,
+    "audit": "PASS",
+    "sft_screen_nested_in_sft_final": true,
+    "complete_internal_test_rows_preserved": 2496,
+    "base_prediction_rows_preserved": 2496
+  },
+  "source_evidence": {
+    "config": "configs/data/training_subsets.yaml",
+    "generated_manifest": "data/generated/econochart_v2/subsets/subset_manifest.json"
+  },
+  "interpretation_limits": [
+    "The generated subset files and full manifest are machine artifacts and are not committed to Git.",
+    "The hashes in this summary identify the audited AutoDL build; the tracked design manifest is not a substitute for the generated full-data manifest."
+  ]
+}

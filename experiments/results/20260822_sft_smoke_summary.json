@@ -1,0 +1,55 @@
+{
+  "experiment_id": "sft_qlora_smoke",
+  "checkpoint_stage": "sft_smoke",
+  "status": "passed",
+  "source_commit": "581860c70b1b4d12493732a8802be5f8e48d9476",
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "memory_mib": 24564,
+    "driver": "570.124.04"
+  },
+  "tested_stack": {
+    "python": "3.10.20",
+    "torch": "2.5.1+cu118",
+    "torchvision": "0.20.1+cu118",
+    "transformers": "4.57.1",
+    "trl": "0.28.0",
+    "peft": "0.18.0",
+    "bitsandbytes": "0.49.2",
+    "datasets": "3.1.0"
+  },
+  "training": {
+    "global_step": 2,
+    "train_loss": 3.2662,
+    "eval_loss": 2.5113,
+    "all_losses_finite": true
+  },
+  "memory": {
+    "model_load_peak_cuda_reserved_gib": 4.211,
+    "multimodal_forward_peak_cuda_reserved_gib": 4.213,
+    "trainer_peak_allocated_delta_gib": 1.813,
+    "measurement_limit": "The Trainer value is an allocated-memory delta above its pre-training baseline, not a whole-device peak from nvidia-smi."
+  },
+  "adapter": {
+    "rank": 8,
+    "alpha": 16,
+    "trainable_parameters": 16515072,
+    "trainable_tensors": 504,
+    "size_mib": 31.57,
+    "vision_trainable_parameters": 0,
+    "projector_trainable_parameters": 0,
+    "reload_status": "PASS",
+    "all_tensors_finite": true
+  },
+  "engineering_gates": {
+    "dependency_consistency": "PASS",
+    "preflight": "PASS",
+    "nf4_model_load": "PASS",
+    "multimodal_forward": "PASS",
+    "adapter_save_reload": "PASS"
+  },
+  "notes": [
+    "This smoke run proves the QLoRA engineering chain only; it is not a capability result.",
+    "Torch 2.5.1 was sufficient for this from-scratch smoke, but later audited Trainer checkpoint recovery required Torch 2.6 or newer."
+  ]
+}

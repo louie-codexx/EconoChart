@@ -110,11 +110,13 @@ rank/LR 的高价值候选统一使用嵌套的 4,800 条 screen、1 epoch，并
 - 每项 reward 在采样输出上有合理分布；
 - 已评估不做 RL、继续补 SFT 数据等更简单替代方案。
 
+执行偏差审计（2026-08-29）：正式 R1 在内部 SFT 评测、adapter 重载和 reward 工程门通过后启动，但当时 ChartQA、ChartQAPro 与定性失败案例护栏尚未完成。这不影响内部 SFT→GRPO 配对比较本身，但意味着 R1 只能作为内部审计的探索实验，不能据此发布外部分布或最终产品结论。外部与定性护栏仍须补齐，不能在事后把它们改写成“启动前已通过”。
+
 ### GRPO → 最终结论
 
-- SFT→GRPO 固定测试差值和置信区间支持改善；
-- external benchmark 与人工抽检没有 reward hacking；
-- 消融能说明哪些 reward 分量有效；
+- 若要宣称 GRPO 有独立增益，SFT→GRPO 固定测试差值和置信区间必须支持改善；若区间跨 0，则只能报告“未建立可测边际增益”，不能用 Base→GRPO 的累计提升替代；
+- external benchmark 与人工抽检没有 reward hacking 或未解释的明显退化；
+- 只有 R1 先建立可测非零效应时，才用 reward 消融归因哪些分量有效；若 R1 未建立效应，则不为凑矩阵强行运行 R2；
 - 结果至少在一个独立 seed 或复跑中方向一致，或明确说明只做单次探索的局限。
 
 ## 5. 参数选择如何记录
@@ -131,20 +133,26 @@ rank/LR 的高价值候选统一使用嵌套的 4,800 条 screen、1 epoch，并
 LoRA rank=16
 - 先验：4B 模型仅适配语言 projection，r=16 是容量/成本中间点。
 - 搜索：r=8/16/32，alpha 固定为 2r，其他设置不变。
-- 实验：待填写三组 internal/external、峰值显存与训练时长。
-- 决策：待真实结果后填写，不提前宣称 r=16 最优。
+- 实验：在固定 512 条 val 面板与 LR=2e-4 下，r8-r16 overall=-0.011745，
+  95% CI=[-0.020636,-0.002010]；numeric recall/precision 与 trend 也可靠更低。
+  r8 的 adapter/可训练参数约减半，但端到端吞吐仅高约 1.36%，没有重复运行区间。
+- 决策：选择 r=16/alpha=32。r32 未运行，因为 hard/risk 没有显示仍需更高容量的可靠证据。
 ```
 
 ## 6. Reward 消融
 
-正式 GRPO 至少比较：
+Reward 消融是有条件的归因实验。只有正式 R1 在固定测试上先建立可测非零效应，才优先比较：
 
 - 全 reward；
 - 去掉 format+length，检查结构 reward 是否只是表面优化；
 - 去掉 numeric 或 trend 中一项，验证主要能力来源；
 - 权重敏感性（只有错误分析显示需要时）。
 
-同时报告：分量均值/方差、总 reward、numeric recall/precision、独立测试指标、平均输出长度、重复章节率和数字幻觉案例。若训练 reward 上升而 test numeric 不升，优先怀疑 reward overfitting。
+同时报告：各奖励分量均值/方差、按配置权重重算的优化用加权 reward、TRL 日志 `reward/reward_std` 的未加权适用分量和、零方差 group 比例、numeric recall/precision、独立测试指标、平均输出长度、重复章节率和数字幻觉案例。若优化用加权 reward 或日志未加权适用分量和上升而 test numeric 不升，优先怀疑 reward overfitting。
+
+该术语边界固定到实际运行的 [TRL v0.28.0 `GRPOTrainer`](https://github.com/huggingface/trl/blob/v0.28.0/trl/trainer/grpo_trainer.py)：优势计算使用 `reward_weights`，而同一版本随后记录的聚合 `reward/reward_std` 使用未加权 `nansum`。升级 TRL 后必须重新核对，不能沿用本版本结论。
+
+本次 R1 的 SFT→GRPO overall 为 `-0.000157`，95% CI `[-0.002294, 0.002112]`，所有分项均未建立统计可靠差异，因此 R2 未触发。该决定说明现有预算下无法归因 reward 分量的独立能力收益，不等于 reward 设计已被证明无效。
 
 ## 7. 停止条件
 

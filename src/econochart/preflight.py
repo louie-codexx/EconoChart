@@ -20,7 +20,8 @@ from econochart.training.common import validate_grpo_batch
 
 REQUIRED_PACKAGES = {
     "sft": {
-        "torch": ">=2.5",
+        "torch": ">=2.6",
+        "torchvision": ">=0.21",
         "transformers": ">=4.57.1,<5.16",
         "trl": "==0.28.0",
         "peft": ">=0.18,<0.19",
@@ -30,7 +31,8 @@ REQUIRED_PACKAGES = {
         "tensorboard": ">=2.18,<3",
     },
     "grpo": {
-        "torch": ">=2.5",
+        "torch": ">=2.6",
+        "torchvision": ">=0.21",
         "transformers": ">=4.57.1,<5.16",
         "trl": "==0.28.0",
         "peft": ">=0.18,<0.19",
@@ -40,7 +42,8 @@ REQUIRED_PACKAGES = {
         "tensorboard": ">=2.18,<3",
     },
     "eval": {
-        "torch": ">=2.5",
+        "torch": ">=2.6",
+        "torchvision": ">=0.21",
         "transformers": ">=4.57.1,<5.16",
         "peft": ">=0.18,<0.19",
         "datasets": ">=3,<5",

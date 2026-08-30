@@ -50,6 +50,13 @@
     "train_samples_per_second": 0.716,
     "train_steps_per_second": 0.045
   },
+  "memory": {
+    "gpu_before_training_mib": 3584,
+    "persistent_allocation_delta_mib": 332,
+    "trainer_peak_allocated_delta_mib": 2790,
+    "final_evaluation_peak_allocated_delta_mib": 1387,
+    "measurement_limit": "Trainer-reported deltas relative to its baseline; none is a whole-device peak."
+  },
   "teacher_forced_evaluation": {
     "eval_loss": 0.11699797213077545,
     "eval_runtime_seconds": 188.5806,

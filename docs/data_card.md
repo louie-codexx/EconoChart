@@ -91,7 +91,7 @@ SFT 优先保留全部图片和企业覆盖、减少同一图的重复问题；G
 | ChartQAPro | MIT | test-only 高难挑战集 | 全部禁止训练和选参 |
 | PlotQA | CC-BY-4.0 | 后续可选的数值推理扩展 | 不属于最小闭环 |
 
-本仓库不重新分发公开数据。准备代码从官方 Hugging Face 数据源读取并在本地生成统一 annotation。ChartQAPro 的多轮样本保留历史问答作为上下文，只预测最后一轮，并导出官方评测格式。
+本仓库不重新分发公开数据。准备代码从官方 Hugging Face 数据源读取并在本地生成统一 annotation。ChartQAPro 的多轮样本保留历史问答作为上下文，只预测最后一轮，并导出官方评测格式。原始 `Year` 序列作为答案元数据完整保留，不强制与问答轮数等长；若官方最终目标 `Answer[-1]` 为空，该源行会被确定性排除且不回填，绝不伪造标签。`manifest.json` 同时记录 selected source/evaluable 数量、被排除的源索引与记录 ID、Year 长度异常及保留情况，所生成的是固定可评分子集，不能冒充未经排除的完整官方 test。
 
 ChartQA 准备阶段按规范化 PNG 的完整 SHA-256 检查跨 split 图像重复。固定外部 test 完整保留；先从 validation 删除与 test 同图的全部问答，再从可选 train 删除与清理后 validation 或 test 同图的全部问答，两个可变 split 均不回填。删除前后数量、冲突哈希、分 split 样本 ID、未引用图片文件和最终零重叠检查写入 `manifest.json` 的 `split_decontamination`。
 
