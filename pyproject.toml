@@ -53,6 +53,7 @@ econochart-sft = "econochart.training.sft:main"
 econochart-grpo = "econochart.training.grpo:main"
 econochart-eval = "econochart.evaluation.runner:main"
 econochart-compare = "econochart.evaluation.compare:main"
+econochart-error-migration = "econochart.evaluation.error_migration:main"
 econochart-preflight = "econochart.preflight:main"
 
 [tool.setuptools]
