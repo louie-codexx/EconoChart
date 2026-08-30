@@ -229,6 +229,107 @@ class ExperimentRecordTests(unittest.TestCase):
             self.assertGreater(values["bootstrap_95_ci"][0], 0, name)
             self.assertEqual(values["verdict"], "GRPO_BETTER")
 
+    def test_external_summary_closes_the_guardrail_without_overclaiming(self):
+        summary = load_json(
+            RESULTS / "20260830_external_generalization_summary.json"
+        )
+        models = summary["models"]
+        base_to_sft = summary["paired_comparisons"]["base_to_sft"]
+        sft_to_grpo = summary["paired_comparisons"]["sft_to_grpo"]
+        migration = summary["error_migration_v2"]
+
+        self.assertEqual(summary["status"], "passed")
+        self.assertEqual(summary["conclusion"], "NO_EXTERNAL_GAIN")
+        self.assertEqual(summary["data"]["rows"], 4446)
+        self.assertEqual(sum(summary["data"]["datasets"].values()), 4446)
+        self.assertEqual(
+            models["base"]["metrics"]["overall"]["exact_match"], 0.467386
+        )
+        self.assertEqual(
+            models["sft"]["metrics"]["overall"]["exact_match"], 0.448493
+        )
+        self.assertEqual(
+            models["grpo"]["metrics"]["overall"]["exact_match"], 0.448493
+        )
+        sft_internal = load_json(RESULTS / "20260826_sft_internal_summary.json")
+        grpo_internal = load_json(RESULTS / "20260828_grpo_internal_summary.json")
+        self.assertEqual(
+            models["sft"]["adapter_sha256"], sft_internal["hashes"]["adapter_sha256"]
+        )
+        self.assertEqual(
+            models["grpo"]["adapter_sha256"], grpo_internal["adapter"]["sha256"]
+        )
+        self.assertLess(
+            base_to_sft["overall_exact_match"]["bootstrap_95_ci"][1], 0
+        )
+        self.assertLess(
+            base_to_sft["chartqa_exact_match"]["bootstrap_95_ci"][1], 0
+        )
+        self.assertLessEqual(
+            sft_to_grpo["overall_exact_match"]["bootstrap_95_ci"][0], 0
+        )
+        self.assertGreaterEqual(
+            sft_to_grpo["overall_exact_match"]["bootstrap_95_ci"][1], 0
+        )
+        self.assertEqual(
+            migration["exact_transitions"]["baseline_correct_candidate_wrong"],
+            282,
+        )
+        self.assertEqual(sum(migration["exact_regression_scopes"].values()), 282)
+        self.assertEqual(sum(migration["decision_buckets"].values()), 282)
+        self.assertFalse(summary["decision"]["external_gain_established"])
+        self.assertFalse(summary["decision"]["grpo_external_repair_established"])
+        self.assertFalse(
+            summary["decision"]["open_report_qualitative_review_complete"]
+        )
+        self.assertTrue(summary["decision"]["public_mix_sft_triggered"])
+        for model in models.values():
+            metrics = model["metrics"]
+            for metric_name in ("exact_match", "relaxed_accuracy"):
+                weighted = (
+                    metrics["chartqa"][metric_name] * metrics["chartqa"]["rows"]
+                    + metrics["chartqapro_official_compatible"][metric_name]
+                    * metrics["chartqapro_official_compatible"]["rows"]
+                ) / summary["data"]["rows"]
+                self.assertAlmostEqual(
+                    metrics["overall"][metric_name], weighted, delta=0.000001
+                )
+            self.assertEqual(len(model["prediction_sha256"]), 64)
+
+        expected_base_to_sft = (
+            models["sft"]["metrics"]["overall"]["exact_match"]
+            - models["base"]["metrics"]["overall"]["exact_match"]
+        )
+        self.assertAlmostEqual(
+            base_to_sft["overall_exact_match"]["delta"],
+            expected_base_to_sft,
+            delta=0.000001,
+        )
+
+    def test_s5_inputs_summary_locks_remote_identity_without_claiming_gpu_readiness(self):
+        summary = load_json(
+            RESULTS / "20260831_s5_public_mix_inputs_summary.json"
+        )
+        config = yaml.safe_load(
+            (ROOT / summary["config"]).read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(summary["status"], "passed")
+        self.assertEqual(summary["scope"], "inputs_only")
+        self.assertEqual(summary["data"]["train_rows"], 12800)
+        self.assertEqual(summary["data"]["eval_rows"], 512)
+        self.assertEqual(sum(summary["data"]["train_datasets"].values()), 12800)
+        self.assertEqual(config["data"]["expected_totals"], {"train": 12800, "eval": 512})
+        self.assertEqual(
+            [source["expected_rows"] for source in config["data"]["train"]],
+            [9600, 3200],
+        )
+        self.assertEqual(summary["integrity"]["issues"], [])
+        self.assertFalse(summary["launch_readiness"]["assessed"])
+        self.assertIn("without --inputs-only", summary["launch_readiness"]["required_next_gate"])
+        for value in summary["hashes"].values():
+            self.assertEqual(len(value), 64)
+
     def test_matrix_points_to_reviewed_summaries_and_closes_r1(self):
         matrix = yaml.safe_load(
             (ROOT / "experiments" / "experiment_matrix.yaml").read_text(
@@ -246,8 +347,9 @@ class ExperimentRecordTests(unittest.TestCase):
         self.assertTrue((ROOT / base["evidence"]).is_file())
 
         external = experiments["B1_base_external"]
-        self.assertEqual(external["status"], "in_progress")
-        self.assertIn("no auditable model result", external["progress"])
+        self.assertEqual(external["status"], "completed")
+        self.assertTrue((ROOT / external["evidence"]).is_file())
+        self.assertIn("0.467386", external["result"])
 
         sft_smoke = experiments["S0_sft_smoke"]
         self.assertEqual(sft_smoke["status"], "completed")
@@ -266,6 +368,8 @@ class ExperimentRecordTests(unittest.TestCase):
         self.assertEqual(public_mix["trigger_evidence"]["external_conclusion"], "NO_EXTERNAL_GAIN")
         self.assertEqual(public_mix["trigger_evidence"]["exact_regressions_with_relaxed_regression"], 212)
         self.assertIn("33.3%", public_mix["compute_disclosure"])
+        self.assertTrue((ROOT / public_mix["input_evidence"]).is_file())
+        self.assertIn("full CUDA", public_mix["readiness"])
         for path in public_mix["evaluation_configs"]:
             self.assertTrue((ROOT / path).is_file(), path)
 
@@ -281,6 +385,16 @@ class ExperimentRecordTests(unittest.TestCase):
         self.assertIn("result", full_grpo)
         self.assertIn("attribution", full_grpo)
         self.assertIn("protocol_deviation", full_grpo)
+        self.assertIn("external_result", full_grpo)
+        self.assertNotIn("pending_guardrails", full_grpo)
+        self.assertEqual(
+            full_grpo["closed_external_guardrails"],
+            ["ChartQA", "ChartQAPro", "external_error_migration_review"],
+        )
+        self.assertEqual(
+            full_grpo["remaining_guardrails"],
+            ["open_report_qualitative_review"],
+        )
 
         reward_ablation = experiments["R2_reward_ablation"]
         self.assertEqual(reward_ablation["status"], "not_triggered")
@@ -291,13 +405,19 @@ class ExperimentRecordTests(unittest.TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         data_card = (ROOT / "docs" / "data_card.md").read_text(encoding="utf-8")
         runbook = (ROOT / "docs" / "autodl_runbook.md").read_text(encoding="utf-8")
+        interview = (ROOT / "docs" / "interview_guide.md").read_text(encoding="utf-8")
+        protocol = (ROOT / "docs" / "experiment_protocol.md").read_text(encoding="utf-8")
 
-        self.assertIn("ChartQA 与 ChartQAPro 数据准备门均已通过", readme)
-        self.assertIn("Base 外部评测已在固定 2,500 + 1,946 条子集上启动", readme)
-        self.assertIn("三组模型的外部评测和定性非退化检查仍待完成", readme)
+        self.assertIn("结论为 `NO_EXTERNAL_GAIN`", readme)
+        self.assertIn("12,800/512 无卡输入门通过", readme)
+        self.assertIn("20260830_external_generalization_summary.json", readme)
+        self.assertNotIn("待模型外评", interview)
+        self.assertIn("0.701600 / 0.791200", interview)
+        self.assertIn("不能追溯改写", protocol)
         self.assertIn("Answer[-1]", data_card)
         self.assertIn("确定性排除且不回填", data_card)
         self.assertIn("selected source 与 evaluable 行数", runbook)
+        self.assertIn("s5_public_mix_inputs_summary.json", runbook)
 
 
 if __name__ == "__main__":

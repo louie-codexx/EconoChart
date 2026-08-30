@@ -1,0 +1,268 @@
+{
+  "experiment_id": "external_trilogy_v1",
+  "status": "passed",
+  "completed_on": "2026-08-30",
+  "seed": 20260821,
+  "conclusion": "NO_EXTERNAL_GAIN",
+  "data": {
+    "rows": 4446,
+    "unique_ids": 4446,
+    "datasets": {
+      "chartqa": 2500,
+      "chartqapro_official_compatible": 1946
+    }
+  },
+  "integrity": {
+    "base_artifact_audit": "PASS",
+    "sft_artifact_audit": "PASS",
+    "grpo_artifact_audit": "PASS",
+    "pairing": "PASS",
+    "issues": [],
+    "empty_predictions": 0
+  },
+  "models": {
+    "base": {
+      "config": "configs/eval/base_external.yaml",
+      "model": "Qwen/Qwen3-VL-4B-Instruct",
+      "adapter_sha256": null,
+      "metrics": {
+        "overall": {
+          "exact_match": 0.467386,
+          "relaxed_accuracy": 0.545019
+        },
+        "chartqa": {
+          "rows": 2500,
+          "exact_match": 0.7016,
+          "relaxed_accuracy": 0.7912
+        },
+        "chartqapro_official_compatible": {
+          "rows": 1946,
+          "exact_match": 0.166495,
+          "relaxed_accuracy": 0.228754
+        }
+      },
+      "efficiency": {
+        "mean_latency_seconds": 0.418875,
+        "median_latency_seconds": 0.232374,
+        "samples_per_second": 2.387349,
+        "mean_completion_tokens": 9.449
+      },
+      "prediction_sha256": "6d8f044ac6e80898ca67205ccff5cc37a23f93edf798a6755bc83b8d386d85ea"
+    },
+    "sft": {
+      "config": "configs/eval/sft_external.yaml",
+      "model": "Qwen/Qwen3-VL-4B-Instruct",
+      "adapter_sha256": "2814fd0289533a37eeb7e6c25c1f9eff2232b882b05454a5efcd52141ba4ef39",
+      "metrics": {
+        "overall": {
+          "exact_match": 0.448493,
+          "relaxed_accuracy": 0.536763
+        },
+        "chartqa": {
+          "rows": 2500,
+          "exact_match": 0.6764,
+          "relaxed_accuracy": 0.778
+        },
+        "chartqapro_official_compatible": {
+          "rows": 1946,
+          "exact_match": 0.155704,
+          "relaxed_accuracy": 0.22685
+        }
+      },
+      "efficiency": {
+        "mean_latency_seconds": 0.419377,
+        "median_latency_seconds": 0.359181,
+        "samples_per_second": 2.384489,
+        "mean_completion_tokens": 5.73
+      },
+      "prediction_sha256": "ab162c1cd33a15b92c452a189dfde002983c8ae9b50ec7fba58e4232b5411fd7"
+    },
+    "grpo": {
+      "config": "configs/eval/grpo_external.yaml",
+      "model": "Qwen/Qwen3-VL-4B-Instruct",
+      "adapter_sha256": "d47c083114e26000c1df5bd52676a1ca9dc2ca708a70c7944c97b3824404486b",
+      "metrics": {
+        "overall": {
+          "exact_match": 0.448493,
+          "relaxed_accuracy": 0.536207
+        },
+        "chartqa": {
+          "rows": 2500,
+          "exact_match": 0.6756,
+          "relaxed_accuracy": 0.7756
+        },
+        "chartqapro_official_compatible": {
+          "rows": 1946,
+          "exact_match": 0.156732,
+          "relaxed_accuracy": 0.228662
+        }
+      },
+      "efficiency": {
+        "mean_latency_seconds": 0.42513,
+        "median_latency_seconds": 0.366825,
+        "samples_per_second": 2.35222,
+        "mean_completion_tokens": 5.748
+      },
+      "prediction_sha256": "a873d3e05dfe81048c16800617bd64624cf701d112d142590df7869a8644bcd9"
+    }
+  },
+  "paired_comparisons": {
+    "base_to_sft": {
+      "overall_exact_match": {
+        "delta": -0.018893,
+        "bootstrap_95_ci": [-0.028565, -0.008997],
+        "probability_delta_positive": 0.0
+      },
+      "overall_relaxed_accuracy": {
+        "delta": -0.008256,
+        "bootstrap_95_ci": [-0.018131, 0.001436],
+        "probability_delta_positive": 0.054
+      },
+      "chartqa_exact_match": {
+        "delta": -0.0252,
+        "bootstrap_95_ci": [-0.038, -0.0116],
+        "probability_delta_positive": 0.0
+      },
+      "chartqa_relaxed_accuracy": {
+        "delta": -0.0132,
+        "bootstrap_95_ci": [-0.026, -0.0004],
+        "probability_delta_positive": 0.017
+      },
+      "chartqapro_exact_match": {
+        "delta": -0.010791,
+        "bootstrap_95_ci": [-0.024666, 0.003083],
+        "probability_delta_positive": 0.0605
+      },
+      "chartqapro_relaxed_accuracy": {
+        "delta": -0.001904,
+        "bootstrap_95_ci": [-0.01689, 0.012543],
+        "probability_delta_positive": 0.3905
+      }
+    },
+    "sft_to_grpo": {
+      "overall_exact_match": {
+        "delta": 0.0,
+        "bootstrap_95_ci": [-0.002249, 0.002249],
+        "probability_delta_positive": 0.471
+      },
+      "overall_relaxed_accuracy": {
+        "delta": -0.000556,
+        "bootstrap_95_ci": [-0.003031, 0.002003],
+        "probability_delta_positive": 0.349
+      },
+      "chartqa_exact_match": {
+        "delta": -0.0008,
+        "bootstrap_95_ci": [-0.004, 0.0024],
+        "probability_delta_positive": 0.2415
+      },
+      "chartqa_relaxed_accuracy": {
+        "delta": -0.0024,
+        "bootstrap_95_ci": [-0.006, 0.0008],
+        "probability_delta_positive": 0.066
+      },
+      "chartqapro_exact_match": {
+        "delta": 0.001028,
+        "bootstrap_95_ci": [-0.002569, 0.004625],
+        "probability_delta_positive": 0.671
+      },
+      "chartqapro_relaxed_accuracy": {
+        "delta": 0.001812,
+        "bootstrap_95_ci": [-0.002096, 0.005953],
+        "probability_delta_positive": 0.816
+      }
+    },
+    "base_to_grpo": {
+      "overall_exact_match": {
+        "delta": -0.018893,
+        "bootstrap_95_ci": [-0.028565, -0.009222],
+        "probability_delta_positive": 0.0
+      },
+      "overall_relaxed_accuracy": {
+        "delta": -0.008812,
+        "bootstrap_95_ci": [-0.018361, 0.001067],
+        "probability_delta_positive": 0.0415
+      },
+      "chartqa_exact_match": {
+        "delta": -0.026,
+        "bootstrap_95_ci": [-0.0396, -0.0124],
+        "probability_delta_positive": 0.0
+      },
+      "chartqa_relaxed_accuracy": {
+        "delta": -0.0156,
+        "bootstrap_95_ci": [-0.0288, -0.0028],
+        "probability_delta_positive": 0.0065
+      },
+      "chartqapro_exact_match": {
+        "delta": -0.009764,
+        "bootstrap_95_ci": [-0.023638, 0.004111],
+        "probability_delta_positive": 0.075
+      },
+      "chartqapro_relaxed_accuracy": {
+        "delta": -0.000092,
+        "bootstrap_95_ci": [-0.015061, 0.013862],
+        "probability_delta_positive": 0.4895
+      }
+    }
+  },
+  "error_migration_v2": {
+    "exact_transitions": {
+      "baseline_correct_candidate_wrong": 282,
+      "baseline_wrong_candidate_correct": 198,
+      "both_correct": 1796,
+      "both_wrong": 2170
+    },
+    "relaxed_transitions": {
+      "regressed": 294,
+      "improved": 253
+    },
+    "exact_regression_scopes": {
+      "exact_and_relaxed_regression": 212,
+      "exact_only_relaxed_unchanged": 70
+    },
+    "decision_buckets": {
+      "clear_content_numeric_or_answer_type_error": 144,
+      "exact_only_small_numeric_difference": 38,
+      "representation_or_scorer_ambiguity_candidate_upper_bound": 100
+    },
+    "answer_kind_deltas": {
+      "numeric": {
+        "rows": 2650,
+        "exact_match": -0.030566,
+        "relaxed_accuracy": -0.012994
+      },
+      "text": {
+        "rows": 1796,
+        "exact_match": -0.00167,
+        "relaxed_accuracy": -0.001265
+      }
+    },
+    "interpretation": "The dominant signal is real numeric/content negative transfer, with a secondary representation and scorer-sensitivity component; it is not explained by formatting alone."
+  },
+  "hashes": {
+    "trilogy_audit_summary_sha256": "d1becc279f31632621a6c79f2854f1ed3331e4b68422e17953454511a957dee3",
+    "base_to_sft_error_migration_v2_sha256": "ca75fbc4455a29597295059a67b09b15c7371792ab1698a1059093d58d1ad1a4"
+  },
+  "decision": {
+    "external_gain_established": false,
+    "grpo_external_repair_established": false,
+    "public_mix_sft_triggered": true,
+    "base_retraining_required": false,
+    "grpo_retraining_automatic": false,
+    "open_report_qualitative_review_complete": false
+  },
+  "source_evidence": {
+    "base_predictions": "outputs/evaluation/base_external_v1/predictions.jsonl",
+    "sft_predictions": "outputs/evaluation/sft_external_v1/predictions.jsonl",
+    "grpo_predictions": "outputs/evaluation/grpo_external_v1/predictions.jsonl",
+    "trilogy_audit_summary": "outputs/evaluation/external_trilogy_v1_audit_summary.json",
+    "base_to_sft_error_migration_v2": "outputs/evaluation/base_to_sft_external_error_migration_v2.json"
+  },
+  "limitations": [
+    "This is one base model, one training seed, and one frozen decoding protocol.",
+    "The 1,946-row ChartQAPro boundary excludes two source rows with empty final official answers and does not refill them.",
+    "Error-migration labels are descriptive proxies and do not independently prove OCR, arithmetic, or domain-overfitting causes.",
+    "ChartQA and ChartQAPro are general chart benchmarks, not a dedicated external economics benchmark.",
+    "Open-ended report recommendations and evidence consistency still require a separate manual non-regression review.",
+    "The triggered public-mix SFT ablation has not been trained or evaluated yet."
+  ]
+}

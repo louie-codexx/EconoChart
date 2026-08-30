@@ -4,7 +4,7 @@
 
 EconoChart 不把“跑一次 LoRA”当作项目结论，而是建立一条可审计的实验链：无泄漏数据 → base 基线 → LoRA/QLoRA SFT → 分能力评测与消融 → 可验证 GRPO → 失败复盘。目标能力包括图表理解、数值推理、经营风险诊断和证据约束的决策建议。
 
-> 当前状态（2026-08-30）：正式 SFT 与 3,600 步 GRPO 均已完成并通过 adapter、重载和 2,496 条内部测试审计。GRPO 相对 SFT 的 overall 成对变化为 `-0.000157`，95% CI 为 `[-0.002294, 0.002112]`，所有分项均无统计显著差异，因此不宣称 GRPO 有独立边际增益；Base 到 GRPO 的 `+0.456563` 是 SFT 与 GRPO 的累计提升，不能全部归因于 GRPO。ChartQA 与 ChartQAPro 数据准备门均已通过；Base 外部评测已在固定 2,500 + 1,946 条子集上启动，但尚无可审计模型结果，三组模型的外部评测和定性非退化检查仍待完成。
+> 当前状态（2026-08-31）：正式 SFT 与 3,600 步 GRPO 均已完成并通过 adapter、重载和 2,496 条内部测试审计。GRPO 相对 SFT 的 overall 成对变化为 `-0.000157`，95% CI 为 `[-0.002294, 0.002112]`，所有分项均无统计显著差异，因此不宣称 GRPO 有独立边际增益；Base 到 GRPO 的 `+0.456563` 是 SFT 与 GRPO 的累计提升，不能全部归因于 GRPO。固定 2,500 条 ChartQA + 1,946 条 ChartQAPro 外评也已完成：Base/SFT/GRPO 的 overall exact 分别为 `0.467386/0.448493/0.448493`，Base→SFT 下降 `-0.018893`、95% CI `[-0.028565, -0.008997]`，SFT→GRPO 未建立修复，结论为 `NO_EXTERNAL_GAIN`。错误迁移进一步显示退化主要集中在数值答案，不是单纯格式问题；因此预注册的 9,600 domain + 3,200 ChartQA mixed-SFT 消融已触发，其 12,800/512 无卡输入门通过，GPU 完整预检与训练尚未执行。开放式长报告的建议—证据人工非退化仍是独立待办，不影响 S5 启动门，但继续阻止最终产品级泛化声明。轻量证据见 [外部泛化摘要](experiments/results/20260830_external_generalization_summary.json) 与 [S5 输入摘要](experiments/results/20260831_s5_public_mix_inputs_summary.json)。
 
 ## 为什么这个项目不是普通微调 Demo
 

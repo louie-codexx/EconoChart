@@ -246,6 +246,8 @@ econochart-preflight --stage sft \
   --report outputs/preflight/sft_mixed_chartqa_inputs_v1.json
 ```
 
+2026-08-31 的真实无卡门已通过：train/eval 为 `12,800/512`，来源为 9,600 条 EconoChart-v2.0 + 3,200 条固定 ChartQA；有序记录与选中 ChartQA ID 的哈希已写入 `experiments/results/20260831_s5_public_mix_inputs_summary.json`。该结果只允许进入下一步 GPU 完整 preflight，不等于训练已经启动。
+
 该配置从同一冻结 Base 独立训练，保持 9,600 条 domain、r16/alpha32、lr `2e-4`、2 epochs 与有效 batch 16，仅增加固定身份的 3,200 条 ChartQA train。总行数为 12,800，预计 optimizer steps 由 1,200 增至约 1,600；因此“新增公开数据”是唯一数据因素，但总计算量同时增加 33.3%，报告时必须披露。
 
 ```bash

@@ -43,14 +43,16 @@ experiments:
 
   - id: B1_base_external
     stage: baseline
-    status: in_progress
+    status: completed
     config: configs/eval/base_external.yaml
     prerequisite: audited ChartQA and ChartQAPro preparation
     launched_at: 2026-08-30T10:16:07+08:00
+    completed_on: 2026-08-30
     data_gate: passed with 2,500 fixed ChartQA test rows and 1,946 fixed evaluable ChartQAPro rows
-    progress: Base evaluation was launched; no auditable model result is recorded yet.
+    evidence: experiments/results/20260830_external_generalization_summary.json
     hypothesis: External chart benchmarks test whether internal synthetic-data gains generalize beyond EconoChart-v2.
-    decision: Keep external claims closed until all Base/SFT/GRPO model evaluations and qualitative guardrails pass.
+    result: Base completed 4,446 audited rows with 0.467386 exact match and 0.545019 relaxed accuracy overall; ChartQA scored 0.701600/0.791200 and ChartQAPro scored 0.166495/0.228754 exact/relaxed.
+    decision: Freeze this result as the external control for SFT and GRPO; it is a baseline, not evidence of domain-training gain.
 
   - id: S0_sft_smoke
     stage: sft
@@ -73,6 +75,7 @@ experiments:
       training_summary: experiments/results/20260825_sft_training_summary.json
       screening_summary: experiments/results/20260825_sft_screening_summary.json
       summary: experiments/results/20260826_sft_internal_summary.json
+      external_summary: experiments/results/20260830_external_generalization_summary.json
       artifact_audit: outputs/evaluation/sft_qlora_r16_domain_v1_internal_v1_artifact_audit_v1.json
       paired_report: outputs/evaluation/base_internal_v1_to_sft_qlora_r16_domain_v1_internal_v1_paired_v1.json
     hypothesis: LLM-only QLoRA improves domain structure and verifiable reasoning on a 24GB GPU.
@@ -83,7 +86,9 @@ experiments:
       alpha: 32
     selection_evidence: On the fixed 512-row validation panel, 2e-4 reliably beat 1e-4; at 2e-4, rank 16 beat rank 8 by 0.011745 overall with paired 95% CI [0.002010, 0.020636].
     result: Formal SFT completed on 9,600 rows for 2 epochs. The audited 2,496-row internal test scored 0.806499 overall and 0.752796 hard overall; versus Base, paired overall delta was +0.456719 with 95% CI [0.448794, 0.464756].
-    pending_guardrails: [ChartQA, ChartQAPro, qualitative_failure_review]
+    external_result: On 4,446 public rows, overall exact fell from Base 0.467386 to 0.448493; paired delta -0.018893 with 95% CI [-0.028565, -0.008997]. Error migration localizes the dominant loss to numeric/content behavior, with a secondary representation-sensitive component.
+    closed_external_guardrails: [ChartQA, ChartQAPro, external_error_migration_review]
+    remaining_guardrails: [open_report_qualitative_review]
     primary_metrics: [overall, numeric, trend, evidence, risk]
     guardrails: [ChartQA, ChartQAPro, output_length, format]
 
@@ -149,7 +154,8 @@ experiments:
     evaluation_configs:
       - configs/eval/sft_mixed_internal.yaml
       - configs/eval/sft_mixed_external.yaml
-    readiness: Local config, portable sampling, CPU input-scope preflight, tests, and canonical evaluation identities are ready; the AutoDL inputs-only report is still required before GPU launch.
+    input_evidence: experiments/results/20260831_s5_public_mix_inputs_summary.json
+    readiness: The AutoDL inputs-only gate passed on 12,800 train and 512 eval rows with fixed identity hashes; full CUDA, package, model, and memory readiness remains pending until the GPU preflight passes.
     data_budget: 9,600 domain + 3,200 fixed-seed ChartQA rows x 2 epochs
     single_factor: add a 3,200-row fixed-seed ChartQA subset to 9,600 domain rows
     compute_disclosure: Keeping domain exposures fixed increases total rows and expected optimizer steps from 1,200 to about 1,600; this 33.3% compute increase is part of the add-data intervention and a potential confound.
@@ -186,6 +192,7 @@ experiments:
     evaluation_config: configs/eval/grpo_internal.yaml
     evidence:
       summary: experiments/results/20260828_grpo_internal_summary.json
+      external_summary: experiments/results/20260830_external_generalization_summary.json
       artifact_audit: outputs/evaluation/grpo_qlora_48g_domain_v1_internal_v1_artifact_audit_v1.json
       sft_to_grpo_paired_report: outputs/evaluation/sft_internal_v1_to_grpo_internal_v1_paired_v1.json
       base_to_grpo_paired_report: outputs/evaluation/base_internal_v1_to_grpo_internal_v1_paired_v1.json
@@ -193,8 +200,10 @@ experiments:
     data_budget: 3,600 prompts x 4 generations = 14,400 rollouts; every train entity appears at least once.
     result: Training reached step 3,600 and the final adapter passed static and reload audits. On the audited 2,496-row internal test, GRPO scored 0.806343 overall and 0.754140 hard overall.
     attribution: Versus SFT, paired overall delta was -0.000157 with 95% CI [-0.002294, 0.002112]; every metric was inconclusive, so R1 established neither a significant incremental gain nor a significant regression. Versus Base, overall delta was +0.456563, but this is the cumulative SFT-plus-GRPO effect and is not attributable to GRPO alone.
-    decision: Do not claim an incremental GRPO capability gain; finish external and qualitative guardrails before the final conclusion.
-    pending_guardrails: [ChartQA, ChartQAPro, qualitative_failure_review]
+    external_result: Versus SFT, external overall exact was unchanged at 0.448493 and relaxed changed by -0.000556 with a CI crossing zero; GRPO did not establish a repair. Versus Base, ChartQA exact remained reliably lower.
+    decision: Do not claim an incremental GRPO capability or external-generalization gain; the public-mix SFT ablation is evaluated independently and does not imply an automatic GRPO rerun.
+    closed_external_guardrails: [ChartQA, ChartQAPro, external_error_migration_review]
+    remaining_guardrails: [open_report_qualitative_review]
     primary_metrics: [overall, numeric, trend]
     guardrails: [format, evidence, risk, ChartQA, ChartQAPro, output_length]
 

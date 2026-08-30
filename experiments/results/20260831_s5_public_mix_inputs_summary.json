@@ -1,0 +1,38 @@
+{
+  "experiment_id": "sft_qlora_r16_domain_chartqa_v1_inputs",
+  "status": "passed",
+  "audited_on": "2026-08-31",
+  "scope": "inputs_only",
+  "source_commit": "9b4103eb167cdee336098e97d87b35d28a8371e3",
+  "config": "configs/train/sft_qlora_4090_mixed_chartqa.yaml",
+  "source_report": "outputs/preflight/sft_mixed_chartqa_inputs_v1.json",
+  "data": {
+    "train_rows": 12800,
+    "eval_rows": 512,
+    "train_datasets": {
+      "econochart-v2.0": 9600,
+      "chartqa": 3200
+    }
+  },
+  "integrity": {
+    "issues": [],
+    "severity_counts": {},
+    "schema_and_images": "PASS",
+    "duplicate_and_leakage_checks": "PASS"
+  },
+  "hashes": {
+    "train_ordered_ids_sha256": "1df6a2a7cb93b5ab5509c778105997d0967a63718cd6553d7957e5ee4768b3f3",
+    "train_ordered_records_sha256": "dd17efe3c4a9cfc71ef02562188a5031966db1beecd31884131baacd9d226fb6",
+    "chartqa_selected_ids_sha256": "e46baddc7a4ecea2d964d17417df4966e2c89a93059270b69f4e4ebd9a2d6aed",
+    "eval_ordered_records_sha256": "d85742163720d2e9b7e34425d5c102af58a00ad97e8f99b22f1bd48b142e4795"
+  },
+  "launch_readiness": {
+    "assessed": false,
+    "required_next_gate": "econochart-preflight --stage sft without --inputs-only on the GPU host"
+  },
+  "scope_boundaries": [
+    "This report proves the selected data identity and input integrity only.",
+    "It does not assess CUDA, the base model, packages, memory, or end-to-end training launch readiness.",
+    "The full GPU preflight must reproduce the same 12,800/512 identity before mixed-SFT starts."
+  ]
+}
