@@ -112,6 +112,8 @@ econochart-grpo --config configs/train/grpo_qlora_48g.yaml \
 econochart-prepare-public --config configs/data/public_datasets.yaml --dataset chartqa
 econochart-prepare-public --config configs/data/public_datasets.yaml --dataset chartqapro
 econochart-eval --config configs/eval/base_external.yaml
+econochart-eval --config configs/eval/sft_external.yaml
+econochart-eval --config configs/eval/grpo_external.yaml
 ```
 
 ChartQAPro 只用于最终测试。评测会额外生成 `chartqapro_official_predictions.json`，可再交给官方脚本或 VLMEvalKit 复核。

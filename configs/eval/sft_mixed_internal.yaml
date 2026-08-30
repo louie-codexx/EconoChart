@@ -1,0 +1,11 @@
+extends: configs/eval/sft_internal.yaml
+
+experiment:
+  id: sft_qlora_r16_domain_chartqa_v1_internal_v1
+  checkpoint_stage: sft_mixed
+
+model:
+  adapter_path: outputs/sft_qlora_r16_domain_chartqa_v1/final_adapter
+
+training:
+  output_dir: outputs/evaluation/sft_qlora_r16_domain_chartqa_v1_internal_v1

@@ -19,8 +19,11 @@ model:
 data:
   test:
     - path: data/generated/public/chartqa/annotations/test.jsonl
+      expected_rows: 2500
     - path: data/generated/public/chartqapro/annotations/test.jsonl
-      optional: true
+      expected_rows: 1946
+  expected_totals:
+    test: 4446
 
 generation:
   max_new_tokens: 128
@@ -28,6 +31,7 @@ generation:
   repetition_penalty: 1.0
 
 evaluation:
+  expected_split: test
   save_every: 50
 
 training:

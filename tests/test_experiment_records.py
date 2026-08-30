@@ -260,6 +260,15 @@ class ExperimentRecordTests(unittest.TestCase):
             if path.startswith("experiments/results/"):
                 self.assertTrue((ROOT / path).is_file(), path)
 
+        public_mix = experiments["S5_public_mix_ablation"]
+        self.assertEqual(public_mix["status"], "code_ready")
+        self.assertEqual(public_mix["trigger_status"], "passed")
+        self.assertEqual(public_mix["trigger_evidence"]["external_conclusion"], "NO_EXTERNAL_GAIN")
+        self.assertEqual(public_mix["trigger_evidence"]["exact_regressions_with_relaxed_regression"], 212)
+        self.assertIn("33.3%", public_mix["compute_disclosure"])
+        for path in public_mix["evaluation_configs"]:
+            self.assertTrue((ROOT / path).is_file(), path)
+
         smoke = experiments["R0_grpo_4090_smoke"]
         self.assertEqual(smoke["status"], "completed")
         self.assertTrue((ROOT / smoke["evidence"]).is_file())

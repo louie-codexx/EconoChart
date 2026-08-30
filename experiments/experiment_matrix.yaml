@@ -133,11 +133,31 @@ experiments:
 
   - id: S5_public_mix_ablation
     stage: sft_ablation
-    status: conditional
+    status: code_ready
+    trigger_status: passed
+    trigger_evidence:
+      external_conclusion: NO_EXTERNAL_GAIN
+      base_to_sft_overall_exact_delta: -0.018893
+      base_to_sft_chartqa_exact_delta: -0.0252
+      exact_regressions_with_relaxed_regression: 212
+      exact_regressions_total: 282
     configs:
       - configs/train/sft_qlora_4090.yaml
       - configs/train/sft_qlora_4090_mixed_chartqa.yaml
+    control: outputs/sft_qlora_r16_domain_v1/final_adapter
+    candidate_output: outputs/sft_qlora_r16_domain_chartqa_v1/final_adapter
+    evaluation_configs:
+      - configs/eval/sft_mixed_internal.yaml
+      - configs/eval/sft_mixed_external.yaml
+    readiness: Local config, portable sampling, CPU input-scope preflight, tests, and canonical evaluation identities are ready; the AutoDL inputs-only report is still required before GPU launch.
+    data_budget: 9,600 domain + 3,200 fixed-seed ChartQA rows x 2 epochs
     single_factor: add a 3,200-row fixed-seed ChartQA subset to 9,600 domain rows
+    compute_disclosure: Keeping domain exposures fixed increases total rows and expected optimizer steps from 1,200 to about 1,600; this 33.3% compute increase is part of the add-data intervention and a potential confound.
+    registered_acceptance:
+      chartqa_exact: paired 95% CI lower bound above 0 and point delta at least +0.0126 versus domain-only SFT
+      internal_overall_and_numeric: each paired 95% CI lower bound at least -0.01
+      chartqapro_relaxed: paired 95% CI lower bound at least -0.01
+      inconclusive_policy: do not automatically add another mixture ratio or rerun GRPO
     decision: Test whether generic chart QA improves without diluting domain reasoning.
 
   - id: R0_grpo_4090_smoke

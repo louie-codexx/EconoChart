@@ -212,21 +212,12 @@ tensorboard --logdir outputs/sft_qlora_r16_domain_v1/runs --host 0.0.0.0
 ## 7. SFT 评测与准入判断
 
 ```bash
-export ECONOCHART_ADAPTER_PATH=outputs/sft_qlora_r16_domain_v1/final_adapter
-
-econochart-eval \
-  --config configs/eval/base_internal.yaml \
-  --adapter "$ECONOCHART_ADAPTER_PATH" \
-  --output-dir outputs/evaluation/sft_internal_v1
-
-econochart-eval \
-  --config configs/eval/base_external.yaml \
-  --adapter "$ECONOCHART_ADAPTER_PATH" \
-  --output-dir outputs/evaluation/sft_external_v1
+econochart-eval --config configs/eval/sft_internal.yaml
+econochart-eval --config configs/eval/sft_external.yaml
 
 econochart-compare \
   --baseline outputs/evaluation/base_internal_v1/predictions.jsonl \
-  --candidate outputs/evaluation/sft_internal_v1/predictions.jsonl \
+  --candidate outputs/evaluation/sft_qlora_r16_domain_v1_internal_v1/predictions.jsonl \
   --output outputs/evaluation/base_vs_sft_internal.json
 ```
 
@@ -246,12 +237,47 @@ econochart-compare \
 
 默认筛选只运行第 6 节的四个候选。只有 r=16 显示容量不足时才跑 r=32；只有量化误差成为可信解释时才跑 BF16 LoRA；只有正式 SFT 外部 ChartQA 明显退化时才准备并运行 ChartQA 混合。不要为了矩阵完整而运行没有决策价值的组合。
 
+ChartQA 混合的 CPU 输入门可以在无卡模式运行。`--inputs-only` 只审计实际选中的记录、全量 schema、图片、重复/泄漏和身份哈希；报告会明确写 `scope=inputs_only` 与 `launch_readiness.assessed=false`，不能代替 GPU 启动门：
+
+```bash
+econochart-preflight --stage sft \
+  --config configs/train/sft_qlora_4090_mixed_chartqa.yaml \
+  --inputs-only \
+  --report outputs/preflight/sft_mixed_chartqa_inputs_v1.json
+```
+
+该配置从同一冻结 Base 独立训练，保持 9,600 条 domain、r16/alpha32、lr `2e-4`、2 epochs 与有效 batch 16，仅增加固定身份的 3,200 条 ChartQA train。总行数为 12,800，预计 optimizer steps 由 1,200 增至约 1,600；因此“新增公开数据”是唯一数据因素，但总计算量同时增加 33.3%，报告时必须披露。
+
 ```bash
 # 条件执行，不是默认清单
 econochart-sft --config configs/train/sft_qlora_r32_ablation.yaml
 econochart-sft --config configs/train/sft_lora_4090_ablation.yaml
 econochart-sft --config configs/train/sft_qlora_4090_mixed_chartqa.yaml
 ```
+
+mixed-SFT 真正启动前必须切回 GPU 并重新运行不带 `--inputs-only` 的完整门禁。完成后使用独立配置评测并与 domain-only SFT 做同 ID 配对：
+
+```bash
+econochart-preflight --stage sft \
+  --config configs/train/sft_qlora_4090_mixed_chartqa.yaml \
+  --report outputs/preflight/sft_mixed_chartqa_gpu_v1.json
+econochart-sft --config configs/train/sft_qlora_4090_mixed_chartqa.yaml
+
+econochart-eval --config configs/eval/sft_mixed_internal.yaml
+econochart-eval --config configs/eval/sft_mixed_external.yaml
+
+econochart-compare \
+  --baseline outputs/evaluation/sft_qlora_r16_domain_v1_internal_v1/predictions.jsonl \
+  --candidate outputs/evaluation/sft_qlora_r16_domain_chartqa_v1_internal_v1/predictions.jsonl \
+  --output outputs/evaluation/sft_domain_to_mixed_internal_v1.json
+
+econochart-compare \
+  --baseline outputs/evaluation/sft_external_v1/predictions.jsonl \
+  --candidate outputs/evaluation/sft_qlora_r16_domain_chartqa_v1_external_v1/predictions.jsonl \
+  --output outputs/evaluation/sft_domain_to_mixed_external_v1.json
+```
+
+预注册接受门：ChartQA exact 的 paired 95% CI 必须高于 0，且点估计至少收回既有 `0.0252` 损失的一半（`+0.0126`）；内部 overall 与 numeric 的 paired 95% CI 下界均不得低于 `-0.01`；ChartQAPro relaxed 的下界不得低于 `-0.01`。任一门失败则 S5 不通过；结果不显著则标为 inconclusive，不自动追加新混合比例，也不自动重跑 GRPO。
 
 ## 9. GRPO smoke
 
@@ -280,6 +306,8 @@ econochart-grpo --config configs/train/grpo_qlora_48g.yaml
 ```
 
 完成后以 GRPO `final_adapter` 重跑内部和外部评测，并分别比较 SFT→GRPO、base→GRPO。只有可验证能力改善且 guardrail 未退化，才把 RL 结论写进简历。
+
+已冻结的 canonical 评测配置分别为 `configs/eval/grpo_internal.yaml` 与 `configs/eval/grpo_external.yaml`；不要再用 Base config 加临时 adapter/output 覆盖冒充独立实验身份。
 
 ## 11. OOM 调整顺序
 

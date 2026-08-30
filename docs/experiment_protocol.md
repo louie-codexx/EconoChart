@@ -69,6 +69,10 @@ rank/LR 的高价值候选统一使用嵌套的 4,800 条 screen、1 epoch，并
 | 数据 | domain / domain+ChartQA | 通用图表混合是否改善外部分布且不稀释领域能力 |
 | 模块 | LLM only / 可选 projector | 主要瓶颈是推理映射还是视觉对齐（错误分析触发） |
 
+S5 触发审计（2026-08-30）：正式 domain-only SFT 相对 Base 的外部 overall exact 下降 `0.018893`，ChartQA exact 下降 `0.0252`；282 个 gross Exact 退化中 212 个同时失去 Relaxed，numeric exact/relaxed 分别下降 `0.030566/0.012994`。因此“明显外部退化”条件已满足，执行原先登记的 9,600 domain + 3,200 fixed-seed ChartQA 混合；不因此重训 Base，也不自动重训 GRPO。
+
+S5 在训练前冻结如下接受门：相对 domain-only SFT，ChartQA exact 的 paired 95% CI 下界必须高于 0，且点估计至少恢复 `0.0126`；内部 overall 与 numeric 的 paired 95% CI 下界均不得低于 `-0.01`；ChartQAPro relaxed 的下界不得低于 `-0.01`。总行数增加到 12,800，预计 optimizer steps 从 1,200 增至约 1,600，所以结果解释必须同时披露增加 33.3% 计算量这一潜在混杂。结果不显著时标为 inconclusive，不为凑矩阵自动尝试更多比例。
+
 ### Stage R0：GRPO smoke
 
 问题：Qwen3-VL-4B 与当前 TRL VLM rollout 是否兼容，reward 是否有区分度且不能轻易刷分？

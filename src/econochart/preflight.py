@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.metadata
 import json
 import platform
@@ -15,6 +16,7 @@ from packaging.version import InvalidVersion, Version
 
 from econochart.config import ConfigError, load_config, project_path, resolve_adapter_path, resolve_model_path
 from econochart.data.schema import validate_record
+from econochart.data.training import load_record_sources, summarize_records
 from econochart.io import read_jsonl, write_json
 from econochart.training.common import validate_grpo_batch
 
@@ -58,9 +60,10 @@ REQUIRED_PACKAGES = {
 
 
 class Report:
-    def __init__(self, stage: str, config_path: str) -> None:
+    def __init__(self, stage: str, config_path: str, *, scope: str) -> None:
         self.payload: dict[str, Any] = {
             "stage": stage,
+            "scope": scope,
             "config": config_path,
             "runtime": {"python": platform.python_version(), "platform": platform.platform()},
             "checks": {},
@@ -245,13 +248,32 @@ def _model_checks(
                 )
 
 
+def _sha256_lines(values: list[str]) -> str:
+    digest = hashlib.sha256()
+    for value in values:
+        digest.update(value.encode("utf-8"))
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def _records_sha256(records: list[dict[str, Any]]) -> str:
+    return _sha256_lines(
+        [
+            json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            for record in records
+        ]
+    )
+
+
 def _data_checks(report: Report, stage: str, config: dict[str, Any]) -> None:
     if stage == "data":
         output_root = config.get("data", {}).get("output_root")
         report.check("data_output_root", str(project_path(output_root)) if output_root else None)
         return
+    seed = int(config.get("seed", 20260821))
     data = config.get("data", {})
     data_summary: dict[str, Any] = {}
+    selected_groups: dict[str, list[dict[str, Any]]] = {}
     for group in ("train", "eval", "test"):
         if group not in data:
             continue
@@ -271,16 +293,33 @@ def _data_checks(report: Report, stage: str, config: dict[str, Any]) -> None:
                 sources.append(source_summary)
                 continue
             rows = list(read_jsonl(path))
-            errors = []
-            for row in rows[: min(25, len(rows))]:
-                errors.extend(validate_record(row))
+            errors: list[str] = []
+            schema_error_rows = 0
+            for row in rows:
+                row_errors = validate_record(row)
+                if row_errors:
+                    schema_error_rows += 1
+                    if len(errors) < 5:
+                        errors.extend(f"{row.get('id', '<missing-id>')}: {error}" for error in row_errors)
             if stage == "eval" and group == "test":
                 expected_split = str(config.get("evaluation", {}).get("expected_split", "test"))
             else:
                 expected_split = "val" if group == "eval" else group
             wrong_split = sum(row.get("split") != expected_split for row in rows)
-            source_summary.update({"rows": len(rows), "sample_schema_errors": errors[:5], "wrong_split_rows": wrong_split})
-            effective_rows = min(len(rows), int(source.get("max_samples", len(rows))))
+            source_summary.update(
+                {
+                    "rows": len(rows),
+                    "schema_error_rows": schema_error_rows,
+                    "sample_schema_errors": errors[:5],
+                    "wrong_split_rows": wrong_split,
+                }
+            )
+            max_samples = source.get("max_samples")
+            effective_rows = (
+                len(rows)
+                if max_samples is None or int(max_samples) < 0
+                else min(len(rows), int(max_samples))
+            )
             expected_rows = source.get("expected_rows")
             source_summary.update({"effective_rows": effective_rows, "expected_rows": expected_rows})
             group_rows += effective_rows
@@ -299,8 +338,100 @@ def _data_checks(report: Report, stage: str, config: dict[str, Any]) -> None:
                     "Rerun dataset validation and do not train on this file.",
                 )
             sources.append(source_summary)
-        data_summary[group] = {"effective_rows_upper_bound": group_rows, "sources": sources}
+        group_summary: dict[str, Any] = {"effective_rows_upper_bound": group_rows, "sources": sources}
+        expected_split = (
+            str(config.get("evaluation", {}).get("expected_split", "test"))
+            if stage == "eval" and group == "test"
+            else ("val" if group == "eval" else group)
+        )
+        try:
+            selected = load_record_sources(data[group], expected_split=expected_split, seed=seed)
+        except (FileNotFoundError, KeyError, TypeError, ValueError) as exc:
+            selected = []
+            report.issue(
+                "critical",
+                "data_selection",
+                f"Could not load the effective {group} records: {exc}",
+                "Fix the source identity or frozen row counts before launching this run.",
+            )
+        selected_groups[group] = selected
+        if selected:
+            ids = [str(row["id"]) for row in selected]
+            id_counts = Counter(ids)
+            duplicate_ids = sorted(record_id for record_id, count in id_counts.items() if count > 1)
+            missing_images = sorted(
+                str(row.get("image", ""))
+                for row in selected
+                if not project_path(str(row.get("image", ""))).is_file()
+            )
+            dataset_ids: dict[str, list[str]] = {}
+            for row in selected:
+                dataset_ids.setdefault(str(row.get("dataset", "<missing>")), []).append(str(row["id"]))
+            selected_summary = summarize_records(selected)
+            selected_summary.update(
+                {
+                    "unique_ids": len(id_counts),
+                    "duplicate_id_count": len(duplicate_ids),
+                    "duplicate_id_examples": duplicate_ids[:5],
+                    "missing_image_count": len(missing_images),
+                    "missing_image_examples": missing_images[:5],
+                    "ordered_ids_sha256": _sha256_lines(ids),
+                    "ordered_records_sha256": _records_sha256(selected),
+                    "dataset_ids_sha256": {
+                        name: _sha256_lines(sorted(values)) for name, values in sorted(dataset_ids.items())
+                    },
+                }
+            )
+            group_summary["selected"] = selected_summary
+            expected_total = data.get("expected_totals", {}).get(group)
+            if expected_total is not None and len(selected) != int(expected_total):
+                report.issue(
+                    "critical",
+                    "data",
+                    f"Configured {group} total is {int(expected_total)}, but selection produced {len(selected)} rows.",
+                    "Restore the frozen source files or correct data.expected_totals before launch.",
+                )
+            if duplicate_ids:
+                report.issue(
+                    "critical",
+                    "data_identity",
+                    f"Effective {group} data contains {len(duplicate_ids)} duplicate record IDs.",
+                    "Deduplicate the configured sources before launch.",
+                )
+            if missing_images:
+                report.issue(
+                    "critical",
+                    "data_images",
+                    f"Effective {group} data references {len(missing_images)} missing image files.",
+                    "Rebuild or restore every referenced image before launch.",
+                )
+        data_summary[group] = group_summary
+    leakage: dict[str, Any] = {}
+    for left, right in (("train", "eval"), ("train", "test"), ("eval", "test")):
+        if left not in selected_groups or right not in selected_groups:
+            continue
+        left_ids = {str(row["id"]) for row in selected_groups[left]}
+        right_ids = {str(row["id"]) for row in selected_groups[right]}
+        left_images = {str(row.get("image", "")) for row in selected_groups[left]}
+        right_images = {str(row.get("image", "")) for row in selected_groups[right]}
+        id_overlap = sorted(left_ids & right_ids)
+        image_overlap = sorted(left_images & right_images)
+        name = f"{left}_to_{right}"
+        leakage[name] = {
+            "id_overlap_count": len(id_overlap),
+            "id_overlap_examples": id_overlap[:5],
+            "image_path_overlap_count": len(image_overlap),
+            "image_path_overlap_examples": image_overlap[:5],
+        }
+        if id_overlap or image_overlap:
+            report.issue(
+                "critical",
+                "data_leakage",
+                f"{left}/{right} overlap detected: ids={len(id_overlap)}, image_paths={len(image_overlap)}.",
+                "Restore the frozen split boundary before launch.",
+            )
     report.check("data", data_summary)
+    report.check("data_leakage", leakage)
 
 
 def run_preflight(
@@ -309,14 +440,17 @@ def run_preflight(
     stage: str,
     model_override: str | None = None,
     adapter_override: str | None = None,
+    inputs_only: bool = False,
 ) -> dict[str, Any]:
-    report = Report(stage, str(config.get("_config_path", "<memory>")))
+    scope = "inputs_only" if inputs_only else "launch"
+    report = Report(stage, str(config.get("_config_path", "<memory>")), scope=scope)
     # Source-checkout users can invoke preflight before package metadata rejects Python 3.9.
     if sys.version_info < (3, 10):  # noqa: UP036
         report.issue("critical", "python", "Python 3.10+ is required.", "Create a Python 3.10 or 3.11 environment.")
-    _package_checks(report, stage, config)
-    _cuda_checks(report, stage, config)
-    _model_checks(report, stage, config, model_override, adapter_override)
+    if not inputs_only:
+        _package_checks(report, stage, config)
+        _cuda_checks(report, stage, config)
+        _model_checks(report, stage, config, model_override, adapter_override)
     _data_checks(report, stage, config)
     if stage == "grpo":
         try:
@@ -333,6 +467,14 @@ def run_preflight(
                 "Full-parameter training cannot update a 4-bit quantized base model.",
                 "Use QLoRA, or disable quantization for full tuning on suitable hardware.",
             )
+    if inputs_only:
+        report.check(
+            "launch_readiness",
+            {
+                "assessed": False,
+                "required_next_gate": f"econochart-preflight --stage {stage} without --inputs-only on the GPU host",
+            },
+        )
     return report.finalize()
 
 
@@ -343,16 +485,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", help="Override base model path")
     parser.add_argument("--adapter", help="Override adapter path")
     parser.add_argument("--report", help="Optional JSON report path")
+    parser.add_argument(
+        "--inputs-only",
+        action="store_true",
+        help="Audit deterministic data/config identity without claiming package, model, or CUDA launch readiness",
+    )
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
+    if args.inputs_only and args.stage == "data":
+        raise SystemExit("--inputs-only is for sft/grpo/eval configs; stage=data is already data-only")
     report = run_preflight(
         load_config(args.config),
         stage=args.stage,
         model_override=args.model,
         adapter_override=args.adapter,
+        inputs_only=args.inputs_only,
     )
     if args.report:
         write_json(project_path(args.report), report)

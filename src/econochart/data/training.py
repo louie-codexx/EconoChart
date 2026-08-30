@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any
 
 from econochart.config import ROOT, project_path
@@ -39,6 +40,17 @@ def _sample_records(
     )[:max_samples]
 
 
+def _sampling_namespace(source: dict[str, Any], source_index: int) -> str:
+    explicit = source.get("sampling_namespace")
+    if explicit is not None:
+        value = str(explicit).strip()
+        if not value:
+            raise ValueError("sampling_namespace must be a non-empty string")
+        return f"source:{value}"
+    configured_path = Path(str(source["path"])).as_posix()
+    return f"source:{source_index}:{configured_path}"
+
+
 def load_record_sources(
     sources: Iterable[dict[str, Any]],
     *,
@@ -63,7 +75,7 @@ def load_record_sources(
             records,
             source.get("max_samples"),
             seed,
-            namespace=f"source:{source_index}:{path.as_posix()}",
+            namespace=_sampling_namespace(source, source_index),
         )
         expected_rows = source.get("expected_rows")
         if expected_rows is not None and len(records) != int(expected_rows):

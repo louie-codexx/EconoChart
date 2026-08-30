@@ -18,9 +18,9 @@ from econochart.data.public import (
 )
 from econochart.data.schema import validate_record
 from econochart.data.subsets import select_grpo_records, select_sft_records, select_validation_records
-from econochart.data.training import make_grpo_example, make_sft_example
+from econochart.data.training import load_record_sources, make_grpo_example, make_sft_example
 from econochart.data.validate import validate_dataset
-from econochart.io import read_jsonl
+from econochart.io import read_jsonl, write_jsonl
 
 
 class DataPipelineTests(unittest.TestCase):
@@ -402,6 +402,31 @@ class DataPipelineTests(unittest.TestCase):
         grpo = make_grpo_example(grpo_record)
         self.assertIsNotNone(grpo)
         self.assertEqual(grpo["prompt"][1]["content"][0], {"type": "image"})
+
+    def test_explicit_sampling_namespace_is_independent_of_checkout_path(self) -> None:
+        rows = list(
+            read_jsonl(ROOT / "data" / "samples" / "econochart_v2" / "annotations" / "train.jsonl")
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            first_path = Path(temporary) / "first" / "train.jsonl"
+            second_path = Path(temporary) / "second" / "train.jsonl"
+            write_jsonl(first_path, rows)
+            write_jsonl(second_path, rows)
+            common = {
+                "max_samples": 8,
+                "sampling_namespace": "portable-public-mixture-v1",
+            }
+            first = load_record_sources(
+                [{**common, "path": str(first_path)}],
+                expected_split="train",
+                seed=20260821,
+            )
+            second = load_record_sources(
+                [{**common, "path": str(second_path)}],
+                expected_split="train",
+                seed=20260821,
+            )
+        self.assertEqual([row["id"] for row in first], [row["id"] for row in second])
 
     def test_sft_subsets_are_nested_deterministic_and_cover_every_train_chart(self) -> None:
         root = ROOT / "data" / "samples" / "econochart_v2" / "annotations"

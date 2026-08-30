@@ -3,17 +3,28 @@ extends: configs/train/sft_qlora_4090.yaml
 experiment:
   id: sft_qlora_r16_domain_chartqa_v1
   hypothesis: A bounded ChartQA mixture improves external chart QA without diluting domain business reasoning.
+  control: sft_qlora_r16_domain_v1
+  registered_decision:
+    external_primary: ChartQA exact-match delta versus the domain-only SFT must have a paired 95% CI above zero.
+    restoration_target: The ChartQA exact-match point estimate must recover at least 0.0126 of the 0.0252 Base-to-SFT loss.
+    internal_non_inferiority: Internal overall and numeric paired 95% CI lower bounds must each be at least -0.01.
+    external_guardrail: ChartQAPro relaxed-accuracy paired 95% CI lower bound must be at least -0.01.
+    failure_policy: An inconclusive or failed result does not automatically authorize another mixture ratio or GRPO run.
 
 data:
   train:
     - path: data/generated/econochart_v2/subsets/sft_train_9600.jsonl
       expected_rows: 9600
     - path: data/generated/public/chartqa/annotations/train.jsonl
+      sampling_namespace: chartqa_train_s5_v1
       max_samples: 3200
       expected_rows: 3200
   eval:
     - path: data/generated/econochart_v2/subsets/val_512.jsonl
       expected_rows: 512
+  expected_totals:
+    train: 12800
+    eval: 512
 
 training:
   output_dir: outputs/sft_qlora_r16_domain_chartqa_v1

@@ -6,7 +6,7 @@ from pathlib import Path
 from econochart.config import ConfigError, load_config
 from econochart.evaluation.runner import _load_eval_records
 from econochart.models.loading import trainable_parameter_summary
-from econochart.preflight import REQUIRED_PACKAGES
+from econochart.preflight import REQUIRED_PACKAGES, run_preflight
 from econochart.training.common import validate_grpo_batch
 
 
@@ -111,6 +111,48 @@ class TrainingConfigTests(unittest.TestCase):
         central_screen = load_config("configs/train/sft_qlora_r16_screen.yaml")
         self.assertEqual(central_screen["training"]["learning_rate"], 0.0001)
 
+    def test_public_mix_sft_changes_only_the_registered_data_factor(self) -> None:
+        control = load_config("configs/train/sft_qlora_4090.yaml")
+        mixed = load_config("configs/train/sft_qlora_4090_mixed_chartqa.yaml")
+
+        self.assertEqual(mixed["model"], control["model"])
+        self.assertEqual(mixed["adapter"], control["adapter"])
+        self.assertEqual(mixed["seed"], control["seed"])
+        for key, value in control["training"].items():
+            if key != "output_dir":
+                self.assertEqual(mixed["training"][key], value, key)
+        self.assertEqual(mixed["data"]["train"][0], control["data"]["train"][0])
+        self.assertEqual(mixed["data"]["train"][1]["expected_rows"], 3200)
+        self.assertEqual(mixed["data"]["train"][1]["max_samples"], 3200)
+        self.assertEqual(mixed["data"]["train"][1]["sampling_namespace"], "chartqa_train_s5_v1")
+        self.assertEqual(mixed["data"]["expected_totals"], {"train": 12800, "eval": 512})
+        self.assertEqual(
+            mixed["experiment"]["registered_decision"]["restoration_target"],
+            "The ChartQA exact-match point estimate must recover at least 0.0126 of the 0.0252 Base-to-SFT loss.",
+        )
+        self.assertNotEqual(mixed["training"]["output_dir"], control["training"]["output_dir"])
+
+    def test_inputs_only_preflight_audits_data_without_claiming_launch_readiness(self) -> None:
+        report = run_preflight(
+            load_config("configs/train/sft_qlora_smoke.yaml"),
+            stage="sft",
+            inputs_only=True,
+        )
+
+        self.assertEqual(report["status"], "passed", report["issues"])
+        self.assertEqual(report["scope"], "inputs_only")
+        self.assertNotIn("packages", report["checks"])
+        self.assertNotIn("cuda", report["checks"])
+        self.assertNotIn("model", report["checks"])
+        self.assertFalse(report["checks"]["launch_readiness"]["assessed"])
+        self.assertEqual(report["checks"]["data"]["train"]["selected"]["rows"], 8)
+        self.assertEqual(report["checks"]["data"]["eval"]["selected"]["rows"], 4)
+        self.assertEqual(report["checks"]["data"]["train"]["selected"]["missing_image_count"], 0)
+        self.assertEqual(
+            report["checks"]["data_leakage"]["train_to_eval"]["id_overlap_count"],
+            0,
+        )
+
     def test_rank_candidates_match_each_selected_learning_rate(self) -> None:
         pairs = (
             (
@@ -182,6 +224,31 @@ class TrainingConfigTests(unittest.TestCase):
         self.assertEqual(grpo["evaluation"], formal["evaluation"])
         self.assertEqual(development["evaluation"]["expected_split"], "val")
         self.assertEqual(development["data"]["test"][0]["expected_rows"], 512)
+
+    def test_external_and_mixed_evaluations_share_frozen_records_and_generation(self) -> None:
+        base = load_config("configs/eval/base_external.yaml")
+        sft = load_config("configs/eval/sft_external.yaml")
+        grpo = load_config("configs/eval/grpo_external.yaml")
+        mixed = load_config("configs/eval/sft_mixed_external.yaml")
+
+        self.assertEqual([source["expected_rows"] for source in base["data"]["test"]], [2500, 1946])
+        self.assertEqual(base["data"]["expected_totals"]["test"], 4446)
+        for candidate in (sft, grpo, mixed):
+            self.assertEqual(candidate["data"], base["data"])
+            self.assertEqual(candidate["generation"], base["generation"])
+            self.assertEqual(candidate["evaluation"], base["evaluation"])
+            self.assertNotEqual(candidate["model"]["adapter_path"], base["model"]["adapter_path"])
+            self.assertNotEqual(candidate["training"]["output_dir"], base["training"]["output_dir"])
+
+        internal = load_config("configs/eval/sft_internal.yaml")
+        mixed_internal = load_config("configs/eval/sft_mixed_internal.yaml")
+        self.assertEqual(mixed_internal["data"], internal["data"])
+        self.assertEqual(mixed_internal["generation"], internal["generation"])
+        self.assertEqual(mixed_internal["evaluation"], internal["evaluation"])
+        self.assertEqual(
+            mixed_internal["model"]["adapter_path"],
+            "outputs/sft_qlora_r16_domain_chartqa_v1/final_adapter",
+        )
 
 
 if __name__ == "__main__":
