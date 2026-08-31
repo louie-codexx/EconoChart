@@ -330,6 +330,48 @@ class ExperimentRecordTests(unittest.TestCase):
         for value in summary["hashes"].values():
             self.assertEqual(len(value), 64)
 
+    def test_s5_result_records_targeted_repair_and_failed_external_guardrail(self):
+        summary = load_json(
+            RESULTS / "20260831_s5_public_mix_result_summary.json"
+        )
+        paired = summary["paired_domain_sft_to_mixed_sft"]
+        gates = summary["registered_acceptance"]
+        migration = summary["chartqapro_error_migration"]
+
+        self.assertEqual(summary["status"], "completed")
+        self.assertEqual(summary["conclusion"], "EXTERNAL_GUARDRAIL_FAILED")
+        self.assertEqual(summary["training"]["global_step"], 1600)
+        self.assertEqual(summary["training"]["exit_code"], 0)
+        self.assertEqual(summary["external_evaluation"]["rows"], 4446)
+        self.assertGreater(
+            paired["chartqa_exact_match"]["bootstrap_95_ci"][0], 0
+        )
+        self.assertGreaterEqual(paired["chartqa_exact_match"]["delta"], 0.0126)
+        self.assertLess(
+            paired["chartqapro_relaxed_accuracy"]["bootstrap_95_ci"][0],
+            -0.01,
+        )
+        self.assertEqual(gates["chartqa_exact_ci_lower_above_zero"], "PASS")
+        self.assertEqual(
+            gates["chartqapro_relaxed_ci_lower_at_least_minus_0_01"], "FAIL"
+        )
+        self.assertEqual(gates["overall"], "FAIL")
+        self.assertTrue(
+            summary["decision"]["internal_evaluation_skipped_by_early_stop"]
+        )
+        self.assertFalse(summary["decision"]["promote_as_validated_replacement"])
+        self.assertEqual(migration["exact"]["regressed_rows"], 102)
+        self.assertEqual(migration["exact"]["improved_rows"], 136)
+        self.assertEqual(
+            sum(migration["exact"]["primary_regression_reasons"].values()),
+            102,
+        )
+        self.assertEqual(
+            sum(migration["exact"]["metric_scopes"].values()), 102
+        )
+        for value in summary["hashes"].values():
+            self.assertEqual(len(value), 64)
+
     def test_matrix_points_to_reviewed_summaries_and_closes_r1(self):
         matrix = yaml.safe_load(
             (ROOT / "experiments" / "experiment_matrix.yaml").read_text(
@@ -363,13 +405,15 @@ class ExperimentRecordTests(unittest.TestCase):
                 self.assertTrue((ROOT / path).is_file(), path)
 
         public_mix = experiments["S5_public_mix_ablation"]
-        self.assertEqual(public_mix["status"], "code_ready")
+        self.assertEqual(public_mix["status"], "completed")
         self.assertEqual(public_mix["trigger_status"], "passed")
         self.assertEqual(public_mix["trigger_evidence"]["external_conclusion"], "NO_EXTERNAL_GAIN")
         self.assertEqual(public_mix["trigger_evidence"]["exact_regressions_with_relaxed_regression"], 212)
         self.assertIn("33.3%", public_mix["compute_disclosure"])
         self.assertTrue((ROOT / public_mix["input_evidence"]).is_file())
-        self.assertIn("full CUDA", public_mix["readiness"])
+        self.assertTrue((ROOT / public_mix["result_evidence"]).is_file())
+        self.assertIn("full GPU launch gates passed", public_mix["readiness"])
+        self.assertIn("EXTERNAL_GUARDRAIL_FAILED", public_mix["decision"])
         for path in public_mix["evaluation_configs"]:
             self.assertTrue((ROOT / path).is_file(), path)
 
@@ -409,15 +453,19 @@ class ExperimentRecordTests(unittest.TestCase):
         protocol = (ROOT / "docs" / "experiment_protocol.md").read_text(encoding="utf-8")
 
         self.assertIn("结论为 `NO_EXTERNAL_GAIN`", readme)
-        self.assertIn("12,800/512 无卡输入门通过", readme)
+        self.assertIn("结论为 `EXTERNAL_GUARDRAIL_FAILED`", readme)
         self.assertIn("20260830_external_generalization_summary.json", readme)
+        self.assertIn("20260831_s5_public_mix_result_summary.json", readme)
         self.assertNotIn("待模型外评", interview)
         self.assertIn("0.701600 / 0.791200", interview)
+        self.assertIn("Mixed-SFT（S5）", interview)
         self.assertIn("不能追溯改写", protocol)
+        self.assertIn("未建立非劣", protocol)
         self.assertIn("Answer[-1]", data_card)
         self.assertIn("确定性排除且不回填", data_card)
         self.assertIn("selected source 与 evaluable 行数", runbook)
         self.assertIn("s5_public_mix_inputs_summary.json", runbook)
+        self.assertIn("s5_public_mix_result_summary.json", runbook)
 
 
 if __name__ == "__main__":

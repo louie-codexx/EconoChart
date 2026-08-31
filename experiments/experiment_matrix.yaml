@@ -138,7 +138,7 @@ experiments:
 
   - id: S5_public_mix_ablation
     stage: sft_ablation
-    status: code_ready
+    status: completed
     trigger_status: passed
     trigger_evidence:
       external_conclusion: NO_EXTERNAL_GAIN
@@ -155,7 +155,8 @@ experiments:
       - configs/eval/sft_mixed_internal.yaml
       - configs/eval/sft_mixed_external.yaml
     input_evidence: experiments/results/20260831_s5_public_mix_inputs_summary.json
-    readiness: The AutoDL inputs-only gate passed on 12,800 train and 512 eval rows with fixed identity hashes; full CUDA, package, model, and memory readiness remains pending until the GPU preflight passes.
+    result_evidence: experiments/results/20260831_s5_public_mix_result_summary.json
+    readiness: The inputs-only and full GPU launch gates passed with matching 12,800/512 identities; training and the 4,446-row external evaluation completed with exit code 0.
     data_budget: 9,600 domain + 3,200 fixed-seed ChartQA rows x 2 epochs
     single_factor: add a 3,200-row fixed-seed ChartQA subset to 9,600 domain rows
     compute_disclosure: Keeping domain exposures fixed increases total rows and expected optimizer steps from 1,200 to about 1,600; this 33.3% compute increase is part of the add-data intervention and a potential confound.
@@ -164,7 +165,8 @@ experiments:
       internal_overall_and_numeric: each paired 95% CI lower bound at least -0.01
       chartqapro_relaxed: paired 95% CI lower bound at least -0.01
       inconclusive_policy: do not automatically add another mixture ratio or rerun GRPO
-    decision: Test whether generic chart QA improves without diluting domain reasoning.
+    result: ChartQA exact improved by +0.062000 with 95% CI [0.047600, 0.076800], but ChartQAPro relaxed changed by -0.001764 with 95% CI [-0.018805, 0.015873], missing the registered -0.01 non-inferiority lower bound.
+    decision: EXTERNAL_GUARDRAIL_FAILED. The targeted ChartQA repair is established, but the candidate is not promoted as a validated domain-SFT replacement. Internal generation evaluation was skipped after the conjunctive gate became impossible to pass; do not automatically add another mixture ratio or rerun GRPO.
 
   - id: R0_grpo_4090_smoke
     stage: grpo

@@ -73,6 +73,8 @@ S5 触发审计（2026-08-30）：正式 domain-only SFT 相对 Base 的外部 o
 
 S5 在训练前冻结如下接受门：相对 domain-only SFT，ChartQA exact 的 paired 95% CI 下界必须高于 0，且点估计至少恢复 `0.0126`；内部 overall 与 numeric 的 paired 95% CI 下界均不得低于 `-0.01`；ChartQAPro relaxed 的下界不得低于 `-0.01`。总行数增加到 12,800，预计 optimizer steps 从 1,200 增至约 1,600，所以结果解释必须同时披露增加 33.3% 计算量这一潜在混杂。结果不显著时标为 inconclusive，不为凑矩阵自动尝试更多比例。
 
+S5 结果审计（2026-08-31）：mixed-SFT 完成 1,600 steps、2 epochs，训练退出码为 0。相对 domain-only SFT，ChartQA exact 提升 `+0.062000`，95% CI `[0.047600, 0.076800]`，通过主目标；但 ChartQAPro relaxed 变化为 `-0.001764`，95% CI `[-0.018805, 0.015873]`，其下界低于 `-0.01`，故预注册的合取接受门失败。该结果是“未建立非劣”，不是“证明平均性能大幅下降”。由于外部门已使 S5 不可能通过，内部 2,496 条生成评测按成本控制 early-stop 未运行，内部领域保持性仍未知；teacher-forced eval loss 不替代该证据。S5 不晋升、不自动追加混合比例，也不自动重跑 GRPO。
+
 ### Stage R0：GRPO smoke
 
 问题：Qwen3-VL-4B 与当前 TRL VLM rollout 是否兼容，reward 是否有区分度且不能轻易刷分？

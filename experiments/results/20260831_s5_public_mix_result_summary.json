@@ -1,0 +1,211 @@
+{
+  "experiment_id": "sft_qlora_r16_domain_chartqa_v1",
+  "status": "completed",
+  "completed_on": "2026-08-31",
+  "runtime_source_commit": "4f1847a4da4a68e6683c11c24477d4b6e6368729",
+  "conclusion": "EXTERNAL_GUARDRAIL_FAILED",
+  "design": {
+    "control": "sft_qlora_r16_domain_v1",
+    "candidate": "sft_qlora_r16_domain_chartqa_v1",
+    "independent_from_same_base": true,
+    "resumed_from_control": false,
+    "single_data_factor": "Add 3,200 fixed-seed ChartQA train rows while retaining all 9,600 domain rows.",
+    "compute_disclosure": "The candidate used 12,800 rather than 9,600 train rows and about 1,600 rather than 1,200 optimizer steps, a 33.3% compute increase that is part of the add-data intervention and a potential confound."
+  },
+  "gpu_preflight": {
+    "status": "passed",
+    "scope": "launch",
+    "issues": [],
+    "report": "outputs/preflight/sft_mixed_chartqa_gpu_20260831_v1.json",
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "visible_memory_mib": 49140,
+    "torch": "2.6.0+cu118",
+    "cuda_available": true,
+    "data_identity_matches_inputs_only_gate": true
+  },
+  "data": {
+    "train_rows": 12800,
+    "eval_rows": 512,
+    "train_datasets": {
+      "econochart-v2.0": 9600,
+      "chartqa": 3200
+    },
+    "external_rows": 4446,
+    "external_datasets": {
+      "chartqa": 2500,
+      "chartqapro_official_compatible": 1946
+    },
+    "input_identity": {
+      "train_ordered_ids_sha256": "1df6a2a7cb93b5ab5509c778105997d0967a63718cd6553d7957e5ee4768b3f3",
+      "train_ordered_records_sha256": "dd17efe3c4a9cfc71ef02562188a5031966db1beecd31884131baacd9d226fb6",
+      "chartqa_selected_ids_sha256": "e46baddc7a4ecea2d964d17417df4966e2c89a93059270b69f4e4ebd9a2d6aed",
+      "eval_ordered_records_sha256": "d85742163720d2e9b7e34425d5c102af58a00ad97e8f99b22f1bd48b142e4795"
+    }
+  },
+  "training": {
+    "config": "configs/train/sft_qlora_4090_mixed_chartqa.yaml",
+    "output": "outputs/sft_qlora_r16_domain_chartqa_v1",
+    "exit_code": 0,
+    "global_step": 1600,
+    "epochs": 2.0,
+    "train_loss": 0.18807720705866815,
+    "teacher_forced_eval_loss": 0.12550923228263855,
+    "runtime_seconds": 24178.0677,
+    "train_samples_per_second": 1.059,
+    "train_steps_per_second": 0.066,
+    "trainer_peak_allocated_delta_mib": 2814,
+    "memory_measurement_limit": "Trainer-reported allocated-memory delta, not a whole-device peak.",
+    "trainable_parameters": 33030144,
+    "trainable_percent": 0.73879,
+    "trainable_components": {
+      "vision": 0,
+      "projector": 0,
+      "language_or_other": 33030144
+    }
+  },
+  "external_evaluation": {
+    "config": "configs/eval/sft_mixed_external.yaml",
+    "output": "outputs/evaluation/sft_qlora_r16_domain_chartqa_v1_external_v1",
+    "exit_code": 0,
+    "rows": 4446,
+    "metrics": {
+      "overall": {
+        "exact_match": 0.491003,
+        "relaxed_accuracy": 0.564331
+      },
+      "chartqa": {
+        "rows": 2500,
+        "exact_match": 0.7384,
+        "relaxed_accuracy": 0.8284
+      },
+      "chartqapro_official_compatible": {
+        "rows": 1946,
+        "exact_match": 0.173176,
+        "relaxed_accuracy": 0.225086
+      }
+    },
+    "efficiency": {
+      "mean_latency_seconds": 0.342028,
+      "median_latency_seconds": 0.315576,
+      "samples_per_second": 2.923733,
+      "mean_completion_tokens": 4.538
+    }
+  },
+  "paired_domain_sft_to_mixed_sft": {
+    "bootstrap_samples": 2000,
+    "seed": 20260821,
+    "overall_exact_match": {
+      "baseline_mean": 0.448493,
+      "candidate_mean": 0.491003,
+      "delta": 0.04251,
+      "bootstrap_95_ci": [0.032158, 0.052862],
+      "probability_delta_positive": 1.0
+    },
+    "chartqa_exact_match": {
+      "baseline_mean": 0.6764,
+      "candidate_mean": 0.7384,
+      "delta": 0.062,
+      "bootstrap_95_ci": [0.0476, 0.0768],
+      "probability_delta_positive": 1.0
+    },
+    "chartqapro_exact_match_point_estimate": {
+      "baseline_mean": 0.155704,
+      "candidate_mean": 0.173176,
+      "delta": 0.017472
+    },
+    "chartqapro_relaxed_accuracy": {
+      "baseline_mean": 0.22685,
+      "candidate_mean": 0.225086,
+      "delta": -0.001764,
+      "bootstrap_95_ci": [-0.018805, 0.015873],
+      "probability_delta_positive": 0.4295
+    }
+  },
+  "registered_acceptance": {
+    "chartqa_exact_ci_lower_above_zero": "PASS",
+    "chartqa_exact_point_delta_at_least_0_0126": "PASS",
+    "chartqapro_relaxed_ci_lower_at_least_minus_0_01": "FAIL",
+    "internal_overall_ci_lower_at_least_minus_0_01": "NOT_RUN_AFTER_EXTERNAL_GUARDRAIL_FAILURE",
+    "internal_numeric_ci_lower_at_least_minus_0_01": "NOT_RUN_AFTER_EXTERNAL_GUARDRAIL_FAILURE",
+    "overall": "FAIL"
+  },
+  "chartqapro_error_migration": {
+    "report": "outputs/evaluation/sft_domain_to_mixed_chartqapro_error_migration_v1.json",
+    "status": "passed",
+    "exact": {
+      "rows": 1946,
+      "regressed_rows": 102,
+      "improved_rows": 136,
+      "unchanged_rows": 1708,
+      "primary_regression_reasons": {
+        "numeric_value_error_5_to_10pct": 1,
+        "numeric_value_error_over_10pct": 27,
+        "numeric_value_error_within_5pct": 1,
+        "text_label_or_content_error": 67,
+        "year_value_or_answer_type_error": 6
+      },
+      "metric_scopes": {
+        "exact_and_relaxed_regression": 101,
+        "exact_only_relaxed_unchanged": 1
+      }
+    },
+    "relaxed": {
+      "regressed_rows": 181,
+      "improved_rows": 174,
+      "unchanged_rows": 1591,
+      "regression_mass": 159.839747,
+      "improvement_mass": 156.406731
+    },
+    "output_behavior": {
+      "domain_sft": {
+        "mean_characters": 10.659,
+        "mean_completion_tokens": 6.868,
+        "token_cap_proxy_hits": 9,
+        "multiline_outputs": 5
+      },
+      "mixed_sft": {
+        "mean_characters": 5.86,
+        "mean_completion_tokens": 4.484,
+        "token_cap_proxy_hits": 1,
+        "multiline_outputs": 0
+      }
+    },
+    "interpretation": "The mixture produced 136 exact improvements versus 102 exact regressions, but 101 of the 102 exact regressions also lost relaxed credit. Gross regressions are therefore dominated by substantive content, numeric, and answer-type proxies rather than formatting alone. Relaxed regression and improvement mass were nearly balanced, which explains the near-zero point delta and the wide non-inferiority interval."
+  },
+  "decision": {
+    "promote_as_validated_replacement": false,
+    "chartqa_repair_established": true,
+    "chartqapro_material_average_harm_established": false,
+    "chartqapro_non_inferiority_established": false,
+    "internal_domain_retention_established": false,
+    "internal_evaluation_skipped_by_early_stop": true,
+    "automatic_new_mix_ratio": false,
+    "automatic_grpo_rerun": false,
+    "current_fully_validated_checkpoint": "sft_qlora_r16_domain_v1"
+  },
+  "hashes": {
+    "adapter_model_sha256": "21a92e0953e677e7d19f8492afd5a6e69f63d69d9c1e52ffb56985d4f8d02b6b",
+    "adapter_config_sha256": "c27c3e2e59dfdb1fa7b8b806e1cd09b9cf861c9a28d166136209d67ce4a922c1",
+    "train_results_sha256": "d17cc2f1961fdc9bc76c85465055878a35e697aca9c5a603e8631d4b2c93e449",
+    "external_predictions_sha256": "731cc8223c6adbafd9b2c339adee2533f1a9d2e0495a90ad62554d7a5282668a",
+    "external_metrics_sha256": "c0303e715f4b2738605faab066286df4718f1b6a0bbefd91f8a6ea23e5ddadd2",
+    "paired_external_report_sha256": "10394999a9fc3f90e8991242e492cb2cdaf9a2c7d253f70aeaa5a5c9852d4a91"
+  },
+  "source_evidence": {
+    "inputs_summary": "experiments/results/20260831_s5_public_mix_inputs_summary.json",
+    "external_predictions": "outputs/evaluation/sft_qlora_r16_domain_chartqa_v1_external_v1/predictions.jsonl",
+    "external_metrics": "outputs/evaluation/sft_qlora_r16_domain_chartqa_v1_external_v1/metrics.json",
+    "paired_external_report": "outputs/evaluation/sft_domain_to_mixed_external_v1.json",
+    "chartqapro_error_migration": "outputs/evaluation/sft_domain_to_mixed_chartqapro_error_migration_v1.json"
+  },
+  "hash_boundary": "The eval_results hash shown in the terminal screenshot was not published because its visual transcription was not a valid 64-character SHA-256 digest; no value was guessed or truncated.",
+  "limitations": [
+    "The registered acceptance rule was conjunctive; the failed ChartQAPro relaxed non-inferiority bound is sufficient to reject S5 even though ChartQA and overall exact match improved.",
+    "The ChartQAPro relaxed point delta was only -0.001764. The failed gate means non-inferiority was not established; it is not evidence of a large average degradation.",
+    "The internal 2,496-row generation evaluation was not run after the external guardrail made acceptance impossible, so internal domain retention for this candidate remains unknown. Teacher-forced eval loss is not a substitute.",
+    "ChartQA train and test are from the same benchmark family. The gain establishes targeted distribution repair, not broad chart or economics generalization.",
+    "The error-migration categories are descriptive proxies and do not independently prove OCR, arithmetic, or domain-overfitting causes.",
+    "ChartQA and ChartQAPro are general chart benchmarks rather than a dedicated external economics benchmark.",
+    "Open-ended report recommendation-to-evidence consistency still requires a separate manual non-regression review."
+  ]
+}

@@ -281,6 +281,8 @@ econochart-compare \
 
 预注册接受门：ChartQA exact 的 paired 95% CI 必须高于 0，且点估计至少收回既有 `0.0252` 损失的一半（`+0.0126`）；内部 overall 与 numeric 的 paired 95% CI 下界均不得低于 `-0.01`；ChartQAPro relaxed 的下界不得低于 `-0.01`。任一门失败则 S5 不通过；结果不显著则标为 inconclusive，不自动追加新混合比例，也不自动重跑 GRPO。
 
+2026-08-31 实际结果：GPU 完整 preflight 与 1,600-step mixed-SFT 均退出 0，外评 4,446/4,446 完整。相对 domain-only SFT，overall exact `+0.042510`、ChartQA exact `+0.062000`（95% CI `[0.047600, 0.076800]`）；ChartQAPro relaxed `-0.001764`（95% CI `[-0.018805, 0.015873]`）。最后一项没有建立 `-0.01` 非劣，因此 `S5=EXTERNAL_GUARDRAIL_FAILED`。合取门已不可能通过后执行成本控制 early-stop，未运行 mixed 内部生成评测；不要用训练期 512 条 teacher-forced eval loss 冒充内部能力护栏。结果与工件哈希见 `experiments/results/20260831_s5_public_mix_result_summary.json`。
+
 ## 9. GRPO smoke
 
 确认环境变量仍指向通过门槛的 SFT adapter：
