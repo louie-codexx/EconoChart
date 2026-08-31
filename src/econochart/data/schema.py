@@ -17,6 +17,7 @@ TASK_TYPES = {
     "comprehensive_report",
     "public_chartqa",
     "public_chartqapro",
+    "public_mmefinance",
 }
 DIFFICULTIES = {"easy", "medium", "hard"}
 REQUIRED_FIELDS = {

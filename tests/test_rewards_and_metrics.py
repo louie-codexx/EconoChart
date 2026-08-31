@@ -12,6 +12,8 @@ from econochart.evaluation.metrics import (
     anls,
     chartqapro_accuracy,
     chartqapro_official_rows,
+    mmefinance_audit_rows,
+    mmefinance_surrogate_scores,
     relaxed_accuracy,
     score_row,
 )
@@ -138,6 +140,58 @@ class RewardAndMetricTests(unittest.TestCase):
         self.assertIn("task_type", report["slices"])
         self.assertIn("econochart-v2.0", report["slices"]["dataset"])
         self.assertAlmostEqual(report["efficiency"]["mean_latency_seconds"], 0.25)
+
+    def test_mmefinance_open_answer_surrogates_are_auditable(self) -> None:
+        reference = "Revenue rose from 100 million to 120 million, a 20% increase."
+        prediction = "Revenue increased 20% from 100 to 120 million."
+        scores = mmefinance_surrogate_scores(reference, prediction)
+        self.assertEqual(scores["surrogate_exact_match"], 0.0)
+        self.assertGreater(scores["surrogate_token_f1"], 0.5)
+        self.assertEqual(scores["surrogate_numeric_precision"], 1.0)
+        self.assertEqual(scores["surrogate_numeric_recall"], 1.0)
+        self.assertEqual(scores["output_nonempty"], 1.0)
+
+        row = {
+            "id": "mmefinance_test_00001",
+            "dataset": "mmefinance",
+            "image": "data/generated/public/mmefinance/images/test/table/sample.jpg",
+            "task_type": "public_mmefinance",
+            "view_type": "Table",
+            "industry": "finance",
+            "difficulty": "hard",
+            "question": "How did revenue change?",
+            "answer": reference,
+            "prediction": prediction,
+            "ground_truth": {"answer_aliases": [reference]},
+            "metadata": {
+                "source_index": 1,
+                "source_image_path": "table/sample.jpg",
+                "task_category": "Reason Explanation",
+                "image_type": "Table",
+                "image_style": "Document",
+                "background": "Values are in millions.",
+            },
+        }
+        report = aggregate_metrics([row])
+        self.assertIn("score_contract", report)
+        self.assertIn("Reason Explanation", report["slices"]["task_category"])
+        self.assertIn("Table", report["slices"]["image_type"])
+        self.assertIn("Document", report["slices"]["image_style"])
+        self.assertIn("surrogate_token_f1", report["overall"])
+
+        audit_rows = mmefinance_audit_rows([row])
+        self.assertEqual(len(audit_rows), 1)
+        self.assertEqual(audit_rows[0]["index"], 1)
+        self.assertEqual(audit_rows[0]["task_category"], "Reason Explanation")
+        self.assertEqual(audit_rows[0]["reference_answer"], reference)
+        self.assertEqual(audit_rows[0]["prediction"], prediction)
+        self.assertIn("surrogate_numeric_recall", audit_rows[0]["surrogate_scores"])
+
+        image = object()
+        messages = _build_messages(row, image)
+        user_text = messages[1]["content"][1]["text"]
+        self.assertIn("Background:\nValues are in millions.", user_text)
+        self.assertTrue(user_text.endswith("Question:\nHow did revenue change?"))
 
     def test_paired_comparison_detects_reference_improvement(self) -> None:
         baseline = []

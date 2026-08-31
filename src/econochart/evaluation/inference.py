@@ -6,7 +6,7 @@ from typing import Any
 from PIL import Image
 
 from econochart.config import ROOT
-from econochart.data.training import system_prompt_for
+from econochart.data.training import system_prompt_for, user_prompt_for
 
 
 def _device(model: Any) -> Any:
@@ -26,7 +26,7 @@ def _build_messages(record: dict[str, Any], image: Image.Image) -> list[dict[str
             "role": "user",
             "content": [
                 {"type": "image", "image": image},
-                {"type": "text", "text": record["question"]},
+                {"type": "text", "text": user_prompt_for(record)},
             ],
         },
     ]

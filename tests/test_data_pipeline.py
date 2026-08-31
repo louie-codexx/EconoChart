@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import csv
 import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -14,7 +16,9 @@ from econochart.data.public import (
     _chartqapro_example,
     _decontaminate_chartqa_rows,
     _remove_unreferenced_chartqa_split_images,
+    _safe_extract_zip,
     prepare_chartqapro,
+    prepare_mmefinance,
 )
 from econochart.data.schema import validate_record
 from econochart.data.subsets import select_grpo_records, select_sft_records, select_validation_records
@@ -220,6 +224,113 @@ class DataPipelineTests(unittest.TestCase):
             )
             self.assertEqual(written_rows[0]["metadata"]["year_flags"], ["NO", "YES", "NO", "NO"])
             self.assertTrue(all(validate_record(row) == [] for row in written_rows))
+
+    def test_mmefinance_prepare_preserves_open_answers_and_audit_dimensions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temporary_root = Path(temp_dir)
+            source_tsv = temporary_root / "MMfin.tsv"
+            source_zip = temporary_root / "MMfin.zip"
+            output_root = temporary_root / "data" / "generated" / "public" / "mmefinance"
+            fields = [
+                "index",
+                "image_path",
+                "image_type",
+                "image_style",
+                "task_category",
+                "question",
+                "answer",
+                "background",
+            ]
+            source_rows = [
+                {
+                    "index": "0",
+                    "image_path": "candlestick_chart/sample-a.png",
+                    "image_type": "Candlestick Chart",
+                    "image_style": "Professional",
+                    "task_category": "Risk Warning",
+                    "question": "What risk is visible?",
+                    "answer": "A sharp drawdown raises short-term volatility risk.",
+                    "background": "Use only the displayed price series.",
+                },
+                {
+                    "index": "1",
+                    "image_path": "table/sample-b.jpg",
+                    "image_type": "Table",
+                    "image_style": "Document",
+                    "task_category": "Accurate Numerical Calculation",
+                    "question": "What is the two-year total?",
+                    "answer": "The total is 42.5 million.\nCalculation: 20.0 + 22.5.",
+                    "background": "Values are in millions.",
+                },
+            ]
+            with source_tsv.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t", lineterminator="\n")
+                writer.writeheader()
+                writer.writerows(source_rows)
+            with zipfile.ZipFile(source_zip, "w") as archive:
+                archive.writestr("MMfin/candlestick_chart/sample-a.png", b"fixture-a")
+                archive.writestr("MMfin/table/sample-b.jpg", b"fixture-b")
+
+            config = {
+                "public": {
+                    "mmefinance": {
+                        "dataset_id": "test/MME-Finance",
+                        "revision": "fixture-revision",
+                        "annotation_file": "MMfin.tsv",
+                        "image_archive": "MMfin.zip",
+                        "output_root": str(output_root),
+                        "expected_rows": 2,
+                    }
+                }
+            }
+            with (
+                patch("econochart.data.public.ROOT", temporary_root),
+                patch(
+                    "econochart.data.public._download_hf_dataset_file",
+                    side_effect=[source_tsv, source_zip],
+                ),
+            ):
+                manifest = prepare_mmefinance(config)
+
+            self.assertEqual(manifest["records"], {"test": 2})
+            self.assertEqual(manifest["unique_images"], 2)
+            self.assertEqual(
+                manifest["task_categories"],
+                {"Accurate Numerical Calculation": 1, "Risk Warning": 1},
+            )
+            self.assertEqual(manifest["image_types"], {"Candlestick Chart": 1, "Table": 1})
+            self.assertIn("evaluation only", manifest["role"])
+            self.assertEqual(manifest["source_files"]["extracted_file_count"], 2)
+
+            written_rows = list(read_jsonl(output_root / "annotations" / "test.jsonl"))
+            self.assertEqual(
+                [row["id"] for row in written_rows],
+                ["mmefinance_test_00000", "mmefinance_test_00001"],
+            )
+            self.assertEqual(written_rows[1]["answer"], source_rows[1]["answer"])
+            self.assertEqual(
+                written_rows[1]["metadata"]["task_category"],
+                "Accurate Numerical Calculation",
+            )
+            self.assertEqual(written_rows[0]["metadata"]["dataset_revision"], "fixture-revision")
+            self.assertTrue(all(validate_record(row) == [] for row in written_rows))
+            self.assertTrue(
+                (
+                    temporary_root
+                    / written_rows[0]["image"]
+                ).is_file()
+            )
+
+    def test_public_zip_extraction_rejects_parent_traversal(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temporary_root = Path(temp_dir)
+            archive_path = temporary_root / "unsafe.zip"
+            destination = temporary_root / "safe"
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                archive.writestr("../escape.txt", "unsafe")
+            with self.assertRaisesRegex(ValueError, "Unsafe ZIP member path"):
+                _safe_extract_zip(archive_path, destination)
+            self.assertFalse((temporary_root / "escape.txt").exists())
 
     def test_chartqa_decontamination_preserves_test_and_does_not_refill(self) -> None:
         shared = "1" * 64

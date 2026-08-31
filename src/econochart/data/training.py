@@ -19,6 +19,8 @@ PUBLIC_QA_SYSTEM_PROMPT = (
     "For short-answer questions, return only the concise answer and its unit when applicable."
 )
 
+MMEFINANCE_SYSTEM_PROMPT = "You are a helpful assistant."
+
 GRPO_SYSTEM_PROMPT = (
     "你是一名严谨的数字经济经营分析师。只依据图表作答。"
     "必须给出【结论】和【数据依据】；只有题目要求时才添加【风险】或【建议】。"
@@ -101,15 +103,28 @@ def _absolute_image_path(record: dict[str, Any]) -> str:
 
 
 def _is_public(record: dict[str, Any]) -> bool:
-    return str(record.get("dataset", "")).lower() in {"chartqa", "chartqapro"}
+    return str(record.get("dataset", "")).lower() in {"chartqa", "chartqapro", "mmefinance"}
 
 
 def system_prompt_for(record: dict[str, Any]) -> str:
+    if str(record.get("dataset", "")).lower() == "mmefinance":
+        return MMEFINANCE_SYSTEM_PROMPT
     return PUBLIC_QA_SYSTEM_PROMPT if _is_public(record) else DOMAIN_SYSTEM_PROMPT
+
+
+def user_prompt_for(record: dict[str, Any]) -> str:
+    question = str(record["question"])
+    if str(record.get("dataset", "")).lower() != "mmefinance":
+        return question
+    background = str(record.get("metadata", {}).get("background", "")).strip()
+    if not background:
+        return question
+    return f"Background:\n{background}\n\nQuestion:\n{question}"
 
 
 def make_sft_example(record: dict[str, Any]) -> dict[str, Any]:
     system_prompt = system_prompt_for(record)
+    user_prompt = user_prompt_for(record)
     return {
         "images": [_absolute_image_path(record)],
         "prompt": [
@@ -118,7 +133,7 @@ def make_sft_example(record: dict[str, Any]) -> dict[str, Any]:
                 "role": "user",
                 "content": [
                     {"type": "image"},
-                    {"type": "text", "text": record["question"]},
+                    {"type": "text", "text": user_prompt},
                 ],
             },
         ],

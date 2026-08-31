@@ -1,0 +1,11 @@
+extends: configs/eval/base_mmefinance.yaml
+
+experiment:
+  id: sft_mixed_mmefinance_v1
+  checkpoint_stage: sft_mixed
+
+model:
+  adapter_path: outputs/sft_qlora_r16_domain_chartqa_v1/final_adapter
+
+training:
+  output_dir: outputs/evaluation/sft_mixed_mmefinance_v1

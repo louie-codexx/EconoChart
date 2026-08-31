@@ -19,6 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 data = [
   "datasets>=3.0,<5",
+  "huggingface-hub>=0.34,<2",
   "matplotlib>=3.8,<4",
   "numpy>=1.23.5,<3",
   "Pillow>=10,<13",

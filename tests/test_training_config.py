@@ -250,6 +250,27 @@ class TrainingConfigTests(unittest.TestCase):
             "outputs/sft_qlora_r16_domain_chartqa_v1/final_adapter",
         )
 
+    def test_mmefinance_evaluations_are_open_answer_eval_only_and_paired(self) -> None:
+        base = load_config("configs/eval/base_mmefinance.yaml")
+        sft = load_config("configs/eval/sft_mmefinance.yaml")
+
+        self.assertEqual(base["experiment"]["benchmark"], "mmefinance_en_open")
+        self.assertTrue(base["experiment"]["evaluation_only"])
+        self.assertEqual(base["data"]["expected_totals"], {"test": 1171})
+        self.assertEqual(base["data"]["test"][0]["expected_rows"], 1171)
+        self.assertEqual(base["generation"]["max_new_tokens"], 512)
+        self.assertFalse(base["generation"]["do_sample"])
+        self.assertEqual(sft["data"], base["data"])
+        self.assertEqual(sft["generation"], base["generation"])
+        self.assertEqual(sft["evaluation"], base["evaluation"])
+        self.assertIsNone(base["model"]["adapter_path"])
+        self.assertEqual(sft["experiment"]["checkpoint_stage"], "sft_mixed")
+        self.assertEqual(
+            sft["model"]["adapter_path"],
+            "outputs/sft_qlora_r16_domain_chartqa_v1/final_adapter",
+        )
+        self.assertNotEqual(sft["training"]["output_dir"], base["training"]["output_dir"])
+
 
 if __name__ == "__main__":
     unittest.main()

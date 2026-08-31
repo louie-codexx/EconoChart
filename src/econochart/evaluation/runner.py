@@ -8,7 +8,11 @@ from typing import Any
 from econochart.config import load_config, project_path, resolve_adapter_path, resolve_model_path
 from econochart.data.training import load_record_sources, summarize_records
 from econochart.evaluation.inference import generate_one
-from econochart.evaluation.metrics import aggregate_metrics, chartqapro_official_rows
+from econochart.evaluation.metrics import (
+    aggregate_metrics,
+    chartqapro_official_rows,
+    mmefinance_audit_rows,
+)
 from econochart.io import read_json, read_jsonl, write_json, write_jsonl
 from econochart.models.loading import load_adapter, load_base_model, load_processor
 from econochart.training.common import resolve_output_dir, save_run_snapshot, seed_everything
@@ -82,6 +86,9 @@ def score_predictions(path: str | Path, output_dir: Path, config: dict[str, Any]
     official = chartqapro_official_rows(rows)
     if official:
         write_json(output_dir / "chartqapro_official_predictions.json", official)
+    mmefinance_audit = mmefinance_audit_rows(rows)
+    if mmefinance_audit:
+        write_json(output_dir / "mmefinance_image_aware_judge_input.json", mmefinance_audit)
     return metrics
 
 

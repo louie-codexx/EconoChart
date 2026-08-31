@@ -13,8 +13,8 @@ from econochart.io import read_jsonl, write_json
 
 def _slice_value(row: dict[str, Any], field: str) -> str:
     value = row.get(field)
-    if value is None and field == "scenario":
-        value = row.get("metadata", {}).get("scenario")
+    if value is None and field in {"scenario", "task_category", "image_type", "image_style"}:
+        value = row.get("metadata", {}).get(field)
     return str(value or "unknown")
 
 
@@ -96,7 +96,17 @@ def compare_rows(
         )
 
     slices: dict[str, Any] = {}
-    for field in ("dataset", "task_type", "view_type", "industry", "difficulty", "scenario"):
+    for field in (
+        "dataset",
+        "task_type",
+        "view_type",
+        "industry",
+        "difficulty",
+        "scenario",
+        "task_category",
+        "image_type",
+        "image_style",
+    ):
         buckets: dict[str, list[tuple[dict[str, float | None], dict[str, float | None]]]] = defaultdict(list)
         for left, _, left_score, right_score in aligned:
             buckets[_slice_value(left, field)].append((left_score, right_score))

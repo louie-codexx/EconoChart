@@ -1,0 +1,39 @@
+experiment:
+  id: base_mmefinance_v1
+  checkpoint_stage: base
+  benchmark: mmefinance_en_open
+  evaluation_only: true
+
+seed: 20260821
+
+model:
+  name_or_path: Qwen/Qwen3-VL-4B-Instruct
+  adapter_path: null
+  dtype: bfloat16
+  min_pixels: 200704
+  max_pixels: 802816
+  quantization:
+    mode: 4bit
+    quant_type: nf4
+    compute_dtype: bfloat16
+    double_quant: true
+
+data:
+  test:
+    - path: data/generated/public/mmefinance/annotations/test.jsonl
+      expected_rows: 1171
+  expected_totals:
+    test: 1171
+
+generation:
+  max_new_tokens: 512
+  do_sample: false
+  repetition_penalty: 1.0
+
+evaluation:
+  expected_split: test
+  save_every: 25
+  score_contract: auditable_surrogates_plus_upstream_image_aware_judge_export
+
+training:
+  output_dir: outputs/evaluation/base_mmefinance_v1

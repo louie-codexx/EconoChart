@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import argparse
 import base64
+import csv
 import hashlib
 import io
+import re
 import shutil
+import stat
+import zipfile
 from collections import Counter
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from econochart.config import ROOT, load_config, project_path, require
@@ -24,6 +28,15 @@ PUBLIC_SOURCES = {
         "dataset_id": "ahmed-masry/ChartQAPro",
         "license": "MIT",
         "homepage": "https://github.com/vis-nlp/ChartQAPro",
+        "splits": ("test",),
+    },
+    "mmefinance": {
+        "dataset_id": "hithink-ai/MME-Finance",
+        "revision": "715793a723bbd05a3b9de291f9032d1576833fbf",
+        "license": "CC BY-NC 4.0",
+        "homepage": "https://github.com/HiThink-Research/MME-Finance",
+        "annotation_file": "MMfin.tsv",
+        "image_archive": "MMfin.zip",
         "splits": ("test",),
     },
 }
@@ -489,10 +502,259 @@ def prepare_chartqapro(config: dict[str, Any], *, overwrite: bool = False) -> di
     return manifest
 
 
+_MMEFINANCE_FIELDS = {
+    "index",
+    "image_path",
+    "image_type",
+    "image_style",
+    "task_category",
+    "question",
+    "answer",
+    "background",
+}
+
+
+def _download_hf_dataset_file(dataset_id: str, revision: str, filename: str) -> Path:
+    from huggingface_hub import hf_hub_download
+
+    return Path(
+        hf_hub_download(
+            repo_id=dataset_id,
+            repo_type="dataset",
+            revision=revision,
+            filename=filename,
+        )
+    )
+
+
+def _safe_extract_zip(archive_path: Path, destination: Path) -> list[str]:
+    resolved_destination = destination.resolve()
+    resolved_destination.mkdir(parents=True, exist_ok=True)
+    extracted: list[str] = []
+    with zipfile.ZipFile(archive_path) as archive:
+        planned: list[tuple[zipfile.ZipInfo, Path, str]] = []
+        for info in archive.infolist():
+            normalized = info.filename.replace("\\", "/")
+            member = PurePosixPath(normalized)
+            if (
+                not normalized
+                or member.is_absolute()
+                or ".." in member.parts
+                or re.match(r"^[A-Za-z]:", normalized)
+            ):
+                raise ValueError(f"Unsafe ZIP member path: {info.filename!r}")
+            mode = (info.external_attr >> 16) & 0xFFFF
+            if stat.S_ISLNK(mode):
+                raise ValueError(f"ZIP symlink members are not allowed: {info.filename!r}")
+            target = (resolved_destination / Path(*member.parts)).resolve()
+            if target != resolved_destination and resolved_destination not in target.parents:
+                raise ValueError(f"ZIP member escapes destination: {info.filename!r}")
+            planned.append((info, target, member.as_posix()))
+
+        for info, target, relative in planned:
+            if info.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with archive.open(info) as source, target.open("wb") as output:
+                shutil.copyfileobj(source, output)
+            extracted.append(relative)
+    return extracted
+
+
+def _extracted_image_lookup(images_root: Path) -> dict[str, Path]:
+    candidates: dict[str, set[Path]] = {}
+    for path in images_root.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(images_root).as_posix()
+        parts = PurePosixPath(relative).parts
+        for start in range(len(parts)):
+            suffix = PurePosixPath(*parts[start:]).as_posix()
+            candidates.setdefault(suffix, set()).add(path.resolve())
+    return {
+        suffix: next(iter(paths))
+        for suffix, paths in candidates.items()
+        if len(paths) == 1
+    }
+
+
+def _safe_mmefinance_image_path(value: str) -> str:
+    normalized = value.strip().replace("\\", "/")
+    path = PurePosixPath(normalized)
+    if (
+        not normalized
+        or path.is_absolute()
+        or ".." in path.parts
+        or re.match(r"^[A-Za-z]:", normalized)
+    ):
+        raise ValueError(f"Unsafe MME-Finance image path: {value!r}")
+    return path.as_posix()
+
+
+def _mmefinance_ground_truth(answer: str) -> dict[str, Any]:
+    ground_truth = _public_ground_truth([answer])
+    ground_truth["length_range"] = [1, 1024]
+    ground_truth["evaluation_mode"] = "official_image_aware_judge_with_auditable_surrogates"
+    return ground_truth
+
+
+def prepare_mmefinance(config: dict[str, Any], *, overwrite: bool = False) -> dict[str, Any]:
+    source_config = PUBLIC_SOURCES["mmefinance"]
+    dataset_config = require(config, "public.mmefinance")
+    output_root = project_path(
+        dataset_config.get("output_root", "data/generated/public/mmefinance")
+    )
+    _safe_replace_root(output_root, overwrite)
+
+    dataset_id = str(dataset_config.get("dataset_id", source_config["dataset_id"]))
+    revision = str(dataset_config.get("revision", source_config["revision"]))
+    annotation_filename = str(
+        dataset_config.get("annotation_file", source_config["annotation_file"])
+    )
+    archive_filename = str(
+        dataset_config.get("image_archive", source_config["image_archive"])
+    )
+    expected_rows = int(dataset_config.get("expected_rows", 1171))
+    annotation_source = _download_hf_dataset_file(dataset_id, revision, annotation_filename)
+    image_archive = _download_hf_dataset_file(dataset_id, revision, archive_filename)
+
+    images_root = output_root / "images" / "test"
+    extracted_members = _safe_extract_zip(image_archive, images_root)
+    image_lookup = _extracted_image_lookup(images_root)
+
+    with annotation_source.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        fields = set(reader.fieldnames or [])
+        if fields != _MMEFINANCE_FIELDS:
+            raise ValueError(
+                "Unexpected MME-Finance TSV fields: "
+                f"expected={sorted(_MMEFINANCE_FIELDS)} actual={sorted(fields)}"
+            )
+        source_rows = list(reader)
+    if len(source_rows) != expected_rows:
+        raise ValueError(
+            f"MME-Finance expected {expected_rows} English rows, found {len(source_rows)}"
+        )
+
+    records: list[dict[str, Any]] = []
+    seen_indices: set[int] = set()
+    task_counts: Counter[str] = Counter()
+    image_type_counts: Counter[str] = Counter()
+    image_style_counts: Counter[str] = Counter()
+    image_hashes: dict[Path, str] = {}
+    for source_row in source_rows:
+        source_index = int(str(source_row["index"]).strip())
+        if source_index in seen_indices:
+            raise ValueError(f"Duplicate MME-Finance source index: {source_index}")
+        seen_indices.add(source_index)
+        source_image_path = _safe_mmefinance_image_path(source_row["image_path"])
+        image_path = image_lookup.get(source_image_path)
+        if image_path is None:
+            raise FileNotFoundError(
+                f"MME-Finance image not found or ambiguous after extraction: {source_image_path}"
+            )
+        digest = image_hashes.get(image_path)
+        if digest is None:
+            digest = sha256_file(image_path)
+            image_hashes[image_path] = digest
+        question = str(source_row["question"]).strip()
+        answer = str(source_row["answer"]).strip()
+        image_type = str(source_row["image_type"]).strip()
+        image_style = str(source_row["image_style"]).strip()
+        task_category = str(source_row["task_category"]).strip()
+        if not all((question, answer, image_type, image_style, task_category)):
+            raise ValueError(f"MME-Finance row {source_index} has an empty required value")
+
+        chart_id = f"mmefinance_{digest[:16]}"
+        task_counts[task_category] += 1
+        image_type_counts[image_type] += 1
+        image_style_counts[image_style] += 1
+        records.append(
+            make_record(
+                record_id=f"mmefinance_test_{source_index:05d}",
+                dataset="mmefinance",
+                split="test",
+                entity_id=chart_id,
+                chart_id=chart_id,
+                image=image_path.relative_to(ROOT).as_posix(),
+                industry="finance",
+                view_type=image_type,
+                task_type="public_mmefinance",
+                difficulty="hard",
+                question=question,
+                answer=answer,
+                ground_truth=_mmefinance_ground_truth(answer),
+                metadata={
+                    "source_index": source_index,
+                    "source_image_path": source_image_path,
+                    "image_sha256": digest,
+                    "image_type": image_type,
+                    "image_style": image_style,
+                    "task_category": task_category,
+                    "background": str(source_row.get("background", "")),
+                    "dataset_revision": revision,
+                    "license": source_config["license"],
+                },
+            )
+        )
+
+    expected_indices = set(range(expected_rows))
+    if seen_indices != expected_indices:
+        missing = sorted(expected_indices - seen_indices)[:5]
+        unexpected = sorted(seen_indices - expected_indices)[:5]
+        raise ValueError(
+            "MME-Finance source indices are not the frozen 0..N-1 sequence: "
+            f"missing={missing} unexpected={unexpected}"
+        )
+    records.sort(key=lambda row: int(row["metadata"]["source_index"]))
+    annotation_path = output_root / "annotations" / "test.jsonl"
+    write_jsonl(annotation_path, records)
+    ordered_image_sha256 = hashlib.sha256(
+        "\n".join(str(row["metadata"]["image_sha256"]) for row in records).encode("utf-8")
+    ).hexdigest()
+    manifest = {
+        "dataset": "mmefinance",
+        "source": {
+            **source_config,
+            "dataset_id": dataset_id,
+            "revision": revision,
+        },
+        "records": {"test": len(records)},
+        "unique_images": len(image_hashes),
+        "task_categories": dict(sorted(task_counts.items())),
+        "image_types": dict(sorted(image_type_counts.items())),
+        "image_styles": dict(sorted(image_style_counts.items())),
+        "checksums": {
+            "source_annotation": sha256_file(annotation_source),
+            "source_image_archive": sha256_file(image_archive),
+            "annotations/test.jsonl": sha256_file(annotation_path),
+            "ordered_record_image_sha256": ordered_image_sha256,
+        },
+        "source_files": {
+            "annotation": annotation_filename,
+            "image_archive": archive_filename,
+            "extracted_file_count": len(extracted_members),
+        },
+        "evaluation": {
+            "official": "image-aware judge through the upstream MME-Finance/VLMEvalKit path",
+            "local": "auditable surrogate metrics only; never reported as the official score",
+        },
+        "role": "fixed English open-ended finance benchmark; evaluation only; never used for training or tuning",
+    }
+    write_json(output_root / "manifest.json", manifest)
+    print(f"Prepared MME-Finance English test: {len(records)} records")
+    return manifest
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Download and normalize approved public chart datasets.")
     parser.add_argument("--config", default="configs/data/public_datasets.yaml")
-    parser.add_argument("--dataset", choices=("chartqa", "chartqapro", "all"), default="all")
+    parser.add_argument(
+        "--dataset",
+        choices=("chartqa", "chartqapro", "mmefinance", "all"),
+        default="all",
+    )
     parser.add_argument("--overwrite", action="store_true")
     return parser
 
@@ -504,6 +766,8 @@ def main() -> None:
         prepare_chartqa(config, overwrite=args.overwrite)
     if args.dataset in {"chartqapro", "all"}:
         prepare_chartqapro(config, overwrite=args.overwrite)
+    if args.dataset in {"mmefinance", "all"}:
+        prepare_mmefinance(config, overwrite=args.overwrite)
 
 
 if __name__ == "__main__":

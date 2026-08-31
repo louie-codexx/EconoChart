@@ -19,3 +19,12 @@ public:
     # Test-only benchmark. It must never be added to an SFT or GRPO mixture.
     max_samples:
       test: null
+
+  mmefinance:
+    dataset_id: hithink-ai/MME-Finance
+    revision: 715793a723bbd05a3b9de291f9032d1576833fbf
+    output_root: data/generated/public/mmefinance
+    annotation_file: MMfin.tsv
+    image_archive: MMfin.zip
+    expected_rows: 1171
+    # English open-ended benchmark only. Evaluation-only: never train or tune on it.
