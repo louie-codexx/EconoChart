@@ -260,7 +260,7 @@ class DataPipelineTests(unittest.TestCase):
                     "task_category": "Accurate Numerical Calculation",
                     "question": "What is the two-year total?",
                     "answer": "The total is 42.5 million.\nCalculation: 20.0 + 22.5.",
-                    "background": "Values are in millions.",
+                    "background": "Values are in millions. " + ("context " * 20_000),
                 },
             ]
             with source_tsv.open("w", encoding="utf-8", newline="") as handle:
@@ -308,6 +308,7 @@ class DataPipelineTests(unittest.TestCase):
                 ["mmefinance_test_00000", "mmefinance_test_00001"],
             )
             self.assertEqual(written_rows[1]["answer"], source_rows[1]["answer"])
+            self.assertEqual(written_rows[1]["metadata"]["background"], source_rows[1]["background"])
             self.assertEqual(
                 written_rows[1]["metadata"]["task_category"],
                 "Accurate Numerical Calculation",

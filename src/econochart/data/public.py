@@ -623,15 +623,20 @@ def prepare_mmefinance(config: dict[str, Any], *, overwrite: bool = False) -> di
     extracted_members = _safe_extract_zip(image_archive, images_root)
     image_lookup = _extracted_image_lookup(images_root)
 
-    with annotation_source.open("r", encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle, delimiter="\t")
-        fields = set(reader.fieldnames or [])
-        if fields != _MMEFINANCE_FIELDS:
-            raise ValueError(
-                "Unexpected MME-Finance TSV fields: "
-                f"expected={sorted(_MMEFINANCE_FIELDS)} actual={sorted(fields)}"
-            )
-        source_rows = list(reader)
+    previous_field_limit = csv.field_size_limit()
+    try:
+        csv.field_size_limit(max(previous_field_limit, 16 * 1024 * 1024))
+        with annotation_source.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle, delimiter="\t")
+            fields = set(reader.fieldnames or [])
+            if fields != _MMEFINANCE_FIELDS:
+                raise ValueError(
+                    "Unexpected MME-Finance TSV fields: "
+                    f"expected={sorted(_MMEFINANCE_FIELDS)} actual={sorted(fields)}"
+                )
+            source_rows = list(reader)
+    finally:
+        csv.field_size_limit(previous_field_limit)
     if len(source_rows) != expected_rows:
         raise ValueError(
             f"MME-Finance expected {expected_rows} English rows, found {len(source_rows)}"
