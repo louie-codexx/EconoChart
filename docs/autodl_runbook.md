@@ -334,3 +334,19 @@ econochart-grpo --config configs/train/grpo_qlora_48g.yaml
 3. 保存成功/失败案例和异常日志摘要；
 4. 写出结论、局限、是否继续与下一实验；
 5. 只把人工整理后的轻量记录和图表提交到 Git，不提交 outputs/checkpoint。
+
+## 13. 2026-09-01 项目收口状态
+
+当前项目已关闭，**无需再向 AutoDL 提交训练命令**。最终交付身份固定为：
+
+```text
+base:    /root/autodl-tmp/models/Qwen3-VL-4B-Instruct
+adapter: /root/autodl-tmp/EconoChart/outputs/grpo_qlora_48g_domain_v1/final_adapter
+chain:   Base → Domain SFT → GRPO R1
+```
+
+需要保留的是基座目录、最终 adapter、GRPO `run_manifest.json`/`trainer_state.json`、内部/外部预测与 paired report；这些远端大工件不进入 Git。公开仓库仅保存聚合 summary、哈希和模型卡。
+
+Mixed-SFT 与 MME-Finance 不属于后续自动执行队列。它们已经形成优化诊断：短答案、OCR、实体识别和吞吐改善，但 ChartQAPro 非劣证据不足且 MME-Finance numeric recall 明显下降。若项目未来重开，顺序必须是离线 reward 审计 → mixed-SFT 内部冻结 val 基线 → F2 numeric 300-step GRPO pilot → 内部门通过后扩大预算 → 最后一次 held-out 外评；不能从当前状态直接再跑完整 GRPO，也不能用 MME-Finance 反复选参。
+
+完整最终口径见 `docs/final_model_card.md`、`experiments/results/20260901_final_model_decision.json` 和 `experiments/results/20260901_mmefinance_pair_summary.json`。

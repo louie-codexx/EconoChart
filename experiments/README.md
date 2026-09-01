@@ -77,3 +77,13 @@
 - 完整 predictions 和原始 TensorBoard/W&B 目录；
 - `records/` 下的详细实验日记、逐次排障命令、成本明细和内部面试复盘；
 - `.env`、token、SSH key、AutoDL 私有路径。
+
+## 项目最终摘要
+
+项目于 2026-09-01 收束，交付 checkpoint 为 `Base → Domain SFT → GRPO R1` 的最终 adapter。公开结果目录额外保留：
+
+- `20260901_mmefinance_pair_summary.json`：Base→mixed-SFT 的 1,171 条开放式金融配对诊断、评分边界与工件哈希；
+- `20260901_final_model_decision.json`：最终模型身份、真实 attribution、未晋升候选和未执行 future work；
+- `docs/final_model_card.md`：面向部署与面试的模型卡。
+
+最终选择不会追溯改写历史实验决策。mixed-SFT、F2 numeric reward、300-step recall-repair GRPO 和 projector 解冻均是优化建议；除 mixed-SFT 本身外，后续方案没有运行，不能写成实验结果。

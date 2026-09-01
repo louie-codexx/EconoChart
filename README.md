@@ -4,7 +4,23 @@
 
 EconoChart 不把“跑一次 LoRA”当作项目结论，而是建立一条可审计的实验链：无泄漏数据 → base 基线 → LoRA/QLoRA SFT → 分能力评测与消融 → 可验证 GRPO → 失败复盘。目标能力包括图表理解、数值推理、经营风险诊断和证据约束的决策建议。
 
-> 当前状态（2026-08-31）：正式 SFT 与 3,600 步 GRPO 均已完成；GRPO 相对 SFT 的内部 overall 成对变化为 `-0.000157`、95% CI `[-0.002294, 0.002112]`，未建立独立边际增益。固定 4,446 条公开外评上，domain-only SFT 相对 Base 出现可靠退化，GRPO 未建立修复，原三模型结论为 `NO_EXTERNAL_GAIN`。为检验这一失败，预注册的 9,600 domain + 3,200 ChartQA mixed-SFT 已从同一 Base 独立完成：overall exact `0.448493→0.491003`，ChartQA exact `0.676400→0.738400`、delta `+0.062000`、95% CI `[0.047600, 0.076800]`；但 ChartQAPro relaxed 为 `0.226850→0.225086`、delta `-0.001764`、95% CI `[-0.018805, 0.015873]`，未守住预注册的 `-0.01` 非劣下界。因此 S5 结论为 `EXTERNAL_GUARDRAIL_FAILED`：它证明了定向 ChartQA 修复，但未证明可安全替代 domain-only SFT；该合取门已不可能通过后执行成本控制 early-stop，mixed 内部生成评测未运行。开放式长报告人工非退化和独立经济领域外部基准仍待完成。轻量证据见 [外部泛化摘要](experiments/results/20260830_external_generalization_summary.json)、[S5 输入摘要](experiments/results/20260831_s5_public_mix_inputs_summary.json) 与 [S5 结果摘要](experiments/results/20260831_s5_public_mix_result_summary.json)。
+> 当前状态（2026-09-01）：项目已关闭，不再启动新增训练。交付模型固定为 `Qwen3-VL-4B-Instruct` 加载 `outputs/grpo_qlora_48g_domain_v1/final_adapter`，主线为 `Base → Domain SFT → GRPO R1`。GRPO 完成 3,600 step、14,400 次 rollout 后，在固定 2,496 条内部测试上保持 `0.806343` 的强 SFT 水平；相对 SFT 的成对变化为 `-0.000157`、95% CI `[-0.002294, 0.002112]`，未建立统计可确认的退化。Base→最终 GRPO 的累计 overall 提升为 `+0.456563`，其中包含 SFT 与 GRPO 两阶段贡献。固定 4,446 条 ChartQA/ChartQAPro 外评结论为 `NO_EXTERNAL_GAIN`。并行 mixed-SFT 的 ChartQA exact 提升 `+0.062000`，但未通过 ChartQAPro relaxed 非劣门，故结论为 `EXTERNAL_GUARDRAIL_FAILED`、不晋升。MME-Finance 1,171 条 Base→mixed-SFT 配对流水线和最终审计均通过：surrogate exact/ANLS/token-F1 与效率改善，但 numeric recall 从 `0.699934` 降至 `0.282634`；这些是后续优化诊断，不是官方 MME-Finance 分数，也没有评测最终 GRPO adapter。
+
+## 最终交付模型
+
+| 项目 | 固定值 |
+|---|---|
+| 名称 | EconoChart GRPO R1 |
+| 基座 | `Qwen/Qwen3-VL-4B-Instruct` |
+| adapter | `outputs/grpo_qlora_48g_domain_v1/final_adapter` |
+| adapter SHA-256 | `d47c083114e26000c1df5bd52676a1ca9dc2ca708a70c7944c97b3824404486b` |
+| 训练链 | 9,600-row domain QLoRA SFT → 3,600-step GRPO、14,400 rollouts |
+| 内部 overall | `0.806343` |
+| 项目状态 | 已收束；无需再提交训练命令 |
+
+该 adapter 不是独立权重，部署时必须同时加载同一基座。选择 GRPO R1 作为项目交付终点，只表示完整、可重载的 SFT→RL 工件已经完成；能力归因仍严格服从 SFT→GRPO 配对置信区间。
+
+完整审计证据：[GRPO 内部摘要](experiments/results/20260828_grpo_internal_summary.json)、[公开外评摘要](experiments/results/20260830_external_generalization_summary.json)、[Mixed-SFT 摘要](experiments/results/20260831_s5_public_mix_result_summary.json)、[MME-Finance 摘要](experiments/results/20260901_mmefinance_pair_summary.json)、[最终选择摘要](experiments/results/20260901_final_model_decision.json) 与 [最终模型卡](docs/final_model_card.md)。
 
 ## 为什么这个项目不是普通微调 Demo
 
@@ -39,6 +55,7 @@ LoRA/QLoRA 是 SFT 的参数更新方式，不是“先全参数 SFT、再 LoRA�
 | ChartQA train/val | 通用图表 QA 混合消融 | 可选 | 否，按官方来源准备 |
 | ChartQA test | 外部分布基准 | 否 | 否 |
 | ChartQAPro test | 高难真实图表挑战集 | 否 | 否 |
+| MME-Finance English open main | 金融开放回答诊断与官方 judge 导出 | 否 | 否 |
 | `data/samples/econochart_v2` | 代码测试与 GitHub 展示 | 否 | 是 |
 
 默认 v2 配置生成 3,000 家企业、6,000 张图、24,000 条任务对齐问答；实际数量、分布和校验哈希以每次构建生成的 `manifest.json` 为准。正式训练使用确定性、覆盖率约束的预算子集：4,800 条 SFT 参数筛选、9,600 条正式 SFT、3,600 条 GRPO prompt，以及仅来自 val 的 512 条开发面板；2,496 条内部 test 保持完整。公开数据的许可和用途见 [数据卡](docs/data_card.md)。
@@ -191,6 +208,7 @@ python -m ruff check .
 - [实验、消融、阶段门槛与停止条件](docs/experiment_protocol.md)
 - [环境兼容与预检](docs/environment.md)
 - [算法面试讲解与追问](docs/interview_guide.md)
+- [最终模型卡、限制与后续优化路线](docs/final_model_card.md)
 
 ## License
 

@@ -216,3 +216,30 @@ experiments:
     prerequisite: R1 provides a measurable non-zero effect
     result: R1 did not establish a measurable non-zero SFT-to-GRPO effect on the fixed internal test.
     decision: R2 was not run; do not attribute any capability change to individual reward components without the missing prerequisite effect.
+
+  - id: E1_mmefinance_open_pair
+    stage: external_evaluation
+    status: completed
+    benchmark: MME-Finance English open main set
+    role: evaluation_only
+    rows: 1171
+    control: Qwen/Qwen3-VL-4B-Instruct
+    candidate: outputs/sft_qlora_r16_domain_chartqa_v1/final_adapter
+    configs: [configs/eval/base_mmefinance.yaml, configs/eval/sft_mmefinance.yaml]
+    evidence: experiments/results/20260901_mmefinance_pair_summary.json
+    result: Surrogate exact, ANLS, token F1, and efficiency improved, while numeric recall fell from 0.699934 to 0.282634 on 839 numeric rows.
+    score_boundary: The official image-aware judge was not run; deterministic surrogate metrics are audit diagnostics only.
+    decision: Do not promote mixed-SFT or claim broad finance improvement. Use the verified precision/coverage trade-off to design future work, never to tune on the held-out benchmark.
+
+  - id: F0_final_model_selection
+    stage: final_selection
+    status: completed
+    selected_base: Qwen/Qwen3-VL-4B-Instruct
+    selected_adapter: outputs/grpo_qlora_48g_domain_v1/final_adapter
+    selected_adapter_sha256: d47c083114e26000c1df5bd52676a1ca9dc2ca708a70c7944c97b3824404486b
+    evidence: experiments/results/20260901_final_model_decision.json
+    model_card: docs/final_model_card.md
+    selection_type: project_delivery_checkpoint
+    result: The terminal Base-to-domain-SFT-to-GRPO artifact is selected for delivery; no further training is scheduled.
+    attribution: Selection does not establish a statistically significant GRPO gain over SFT and does not change the NO_EXTERNAL_GAIN conclusion.
+    future_work: Mixed-SFT to recall-repair GRPO, projector ablation, and official/human open-answer judging are documented proposals, not completed experiments.

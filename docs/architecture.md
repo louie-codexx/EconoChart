@@ -110,3 +110,15 @@ preflight 在启动前检查该约束。
 - TensorBoard 日志（正式训练）。
 
 原始运行目录默认被 Git 忽略。人工审核后的聚合指标、图表、实验结论和失败复盘才进入 `experiments/`。
+
+## 8. 最终交付与并行诊断分支
+
+最终加载路径是冻结 Qwen3-VL-4B-Instruct 基座加 `grpo_qlora_48g_domain_v1/final_adapter`。这条主线为 `Base → Domain SFT → GRPO R1`。
+
+Mixed-SFT 是从 Base 独立启动的数据混合消融，不是 GRPO 的上游或下游必经阶段；MME-Finance 又只比较 Base 与该 mixed-SFT 候选。项目把三类对象分开：
+
+1. **最终工件**：可保存、重载、部署的 GRPO adapter；
+2. **统计主张**：SFT→GRPO 没有建立显著边际增益，不能被最终工件身份覆盖；
+3. **诊断分支**：mixed-SFT 与 MME-Finance 用于定位外部短答、效率和数值覆盖 trade-off，并生成未执行的下一轮实验方案。
+
+如果未来重开训练，新的 recall-repair GRPO 必须拥有独立 config/output/manifest，先通过 300-step pilot，再进入正式预算，不能覆盖现有 R1 或把建议写成已完成结果。

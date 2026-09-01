@@ -125,6 +125,10 @@ S5 结果审计（2026-08-31）：mixed-SFT 完成 1,600 steps、2 epochs，训�
 - 只有 R1 先建立可测非零效应时，才用 reward 消融归因哪些分量有效；若 R1 未建立效应，则不为凑矩阵强行运行 R2；
 - 结果至少在一个独立 seed 或复跑中方向一致，或明确说明只做单次探索的局限。
 
+项目收束决策（2026-09-01）：`outputs/grpo_qlora_48g_domain_v1/final_adapter` 被选为项目交付 adapter，因为它是既定 `Base → Domain SFT → GRPO` 研究链的最终、可重载工件；该选择不构成“GRPO 统计上优于 SFT”的新证据。SFT→GRPO overall 的 95% CI 跨 0，公开外评也未建立修复，因此最终模型卡必须同时保留 attribution 和 production-readiness 限制。开放式长报告人工非退化未运行，状态从“待完成”改为“项目关闭后保留的已知限制”，不能被静默写成 PASS。
+
+并行 mixed-SFT 与 MME-Finance 只承担失败诊断和 future-work 设计：mixed-SFT 未通过注册的 ChartQAPro 非劣门；MME-Finance Base→mixed-SFT 的 surrogate exact/ANLS/token-F1 与效率改善，但 numeric recall 从 `0.699934` 降到 `0.282634`。官方 image-aware judge 未运行，不能报告官方分数。若以后重开项目，只允许先用内部冻结 validation 做 300-step recall-repair GRPO pilot；MME-Finance 不得作为调参表面。
+
 ## 5. 参数选择如何记录
 
 每个参数写三层理由：

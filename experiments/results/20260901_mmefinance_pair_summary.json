@@ -1,0 +1,158 @@
+{
+  "experiment_id": "mmefinance_base_to_mixed_sft_pair_v1",
+  "status": "passed",
+  "completed_on": "2026-09-01",
+  "benchmark": {
+    "name": "MME-Finance English open main set",
+    "dataset_id": "hithink-ai/MME-Finance",
+    "rows": 1171,
+    "unique_ids": 1171,
+    "license": "CC BY-NC 4.0",
+    "role": "evaluation_only",
+    "official_image_aware_judge_run": false,
+    "score_contract": "The surrogate metrics below are deterministic audit diagnostics and are not the official MME-Finance score."
+  },
+  "comparison": {
+    "baseline": {
+      "name": "Qwen3-VL-4B-Instruct",
+      "config": "configs/eval/base_mmefinance.yaml",
+      "output": "outputs/evaluation/base_mmefinance_v1",
+      "exit_code": 0
+    },
+    "candidate": {
+      "name": "sft_qlora_r16_domain_chartqa_v1",
+      "config": "configs/eval/sft_mmefinance.yaml",
+      "adapter": "outputs/sft_qlora_r16_domain_chartqa_v1/final_adapter",
+      "output": "outputs/evaluation/sft_mixed_mmefinance_v1",
+      "exit_code": 0,
+      "is_project_final_model": false
+    },
+    "paired_rows": 1171,
+    "bootstrap_samples": 2000,
+    "seed": 20260821
+  },
+  "pipeline": {
+    "started_at": "2026-09-01T11:26:55+08:00",
+    "candidate_started_at": "2026-09-01T14:43:36+08:00",
+    "compare_started_at": "2026-09-01T15:15:58+08:00",
+    "finished_at": "2026-09-01T15:18:50+08:00",
+    "status_log": "outputs/evaluation/mmefinance_pair_v1_status.log",
+    "gate": "PASS",
+    "final_audit_gate": "PASS",
+    "reference_alignment": "PASS"
+  },
+  "paired_metrics": {
+    "surrogate_exact_match": {
+      "rows": 1171,
+      "baseline_mean": 0.0,
+      "candidate_mean": 0.112724,
+      "delta": 0.112724,
+      "bootstrap_95_ci": [0.094791, 0.130658],
+      "probability_delta_positive": 1.0
+    },
+    "surrogate_anls": {
+      "rows": 1171,
+      "baseline_mean": 0.00307,
+      "candidate_mean": 0.17541,
+      "delta": 0.17234,
+      "bootstrap_95_ci": [0.15123, 0.193084],
+      "probability_delta_positive": 1.0
+    },
+    "surrogate_token_f1": {
+      "rows": 1171,
+      "baseline_mean": 0.239071,
+      "candidate_mean": 0.268473,
+      "delta": 0.029402,
+      "bootstrap_95_ci": [0.005453, 0.052209],
+      "probability_delta_positive": 0.994
+    },
+    "surrogate_numeric_precision": {
+      "rows": 839,
+      "baseline_mean": 0.389071,
+      "candidate_mean": 0.40725,
+      "delta": 0.018179,
+      "bootstrap_95_ci": [-0.016267, 0.05267],
+      "probability_delta_positive": 0.8375
+    },
+    "surrogate_numeric_recall": {
+      "rows": 839,
+      "baseline_mean": 0.699934,
+      "candidate_mean": 0.282634,
+      "delta": -0.417299,
+      "bootstrap_95_ci": [-0.446275, -0.388076],
+      "probability_delta_positive": 0.0
+    },
+    "output_nonempty": {
+      "rows": 1171,
+      "baseline_mean": 1.0,
+      "candidate_mean": 1.0,
+      "delta": 0.0,
+      "bootstrap_95_ci": [0.0, 0.0],
+      "probability_delta_positive": 0.0
+    }
+  },
+  "efficiency": {
+    "baseline": {
+      "mean_latency_seconds": 9.759473,
+      "median_latency_seconds": 8.024629,
+      "samples_per_second": 0.102465,
+      "mean_completion_tokens": 254.254
+    },
+    "candidate": {
+      "mean_latency_seconds": 1.584612,
+      "median_latency_seconds": 0.528174,
+      "samples_per_second": 0.631069,
+      "mean_completion_tokens": 22.969
+    }
+  },
+  "diagnostic_slices": {
+    "task_category_best_token_f1_delta": [
+      {"name": "OCR", "rows": 178, "delta": 0.405899},
+      {"name": "Spatial Awareness", "rows": 229, "delta": 0.232079},
+      {"name": "Entity Recognition", "rows": 163, "delta": 0.194343}
+    ],
+    "task_category_worst_token_f1_delta": [
+      {"name": "Image Caption", "rows": 164, "delta": -0.307949},
+      {"name": "Investment Advice", "rows": 53, "delta": -0.298359},
+      {"name": "Accurate Numerical Calculation", "rows": 133, "delta": -0.270048}
+    ]
+  },
+  "input_hashes": {
+    "source_tsv_sha256": "b79b9f9fde7b1aff9a2b07ac1643042a601017c0fd3ebd86a589d7ac66b023da",
+    "source_zip_sha256": "d2d1ad9d3047aaba97e4f046e2114e0f160ce67e72efecf7daf043f77afe89f9",
+    "ordered_ids_sha256": "323cfb6fb72e1adb205c25bed46369f23a6643a319d791fc697a846f9597ee99",
+    "ordered_records_sha256": "b7b473aefb21b40657b10bc1e5c4b3cbad83be9d42a171303769cc9a8f1c9d03",
+    "manifest_sha256": "b7e1b44a95b78bdb98c3808e70466dec1c58e66772ffe980635c47064ea8582e"
+  },
+  "artifact_hashes": {
+    "status_log_sha256": "55610085bda3ee8274d0c01118c1472a5ce5dc9d8826fb1eb8260f7b257e6107",
+    "base_predictions_sha256": "197ac7bf1303d522ec2a1e694de16838be253182d94a95b66295ffcb923e1ba8",
+    "base_metrics_sha256": "4b98051ba1eab76a705ff56910b9782f86377a7dd45583b11d8243028e77d892",
+    "base_judge_input_sha256": "40d274d0f5cafcf0af46392d010db1e4d6c18cab2b1800192b03b946b5f6cb47",
+    "candidate_predictions_sha256": "2f5e93065f65860137d52203280a5e60b6338742bf9aec5af2db6b89f0d4d725",
+    "candidate_metrics_sha256": "6d8c03841b3f6a9084d3b876d2a977f16143a46e4018b0007cb12a1fc6f49571",
+    "candidate_judge_input_sha256": "dc338f67daffcf8a0e0c1cbdc84cca8d8e0aa23a4211cbeb2509eabf051d1243",
+    "paired_comparison_sha256": "5f596f5cbe9d75c258fe8d3403feee278dd61758e230493288a961b9cf04bf22"
+  },
+  "decision": {
+    "official_score_claimed": false,
+    "broad_finance_improvement_claimed": false,
+    "candidate_promoted": false,
+    "verified_positive_signals": [
+      "surrogate exact match",
+      "surrogate ANLS",
+      "surrogate token F1",
+      "latency and completion-length efficiency",
+      "OCR, spatial-awareness, and entity-recognition slices"
+    ],
+    "verified_regression": "Numeric recall fell from 0.699934 to 0.282634 on the 839-row numeric subset.",
+    "interpretation": "The mixed-SFT candidate learned concise extraction behavior but omitted many reference numbers. This benchmark diagnoses a precision/coverage trade-off; it does not evaluate the selected GRPO final adapter and must not be used as training or tuning data.",
+    "future_hypothesis_not_run": "Starting from mixed-SFT, test a recall-biased F2 numeric reward in a 300-step GRPO pilot while guarding numeric precision, overall quality, output length, and unsupported-number rate."
+  },
+  "limitations": [
+    "The official image-aware MME-Finance judge was not run, so no official benchmark score is reported.",
+    "The comparison is Base versus mixed-SFT, not Base/SFT/GRPO trilogy evaluation.",
+    "MME-Finance is held-out evaluation-only evidence and must not be used to tune the proposed reward or pilot hyperparameters.",
+    "Surrogate metrics are useful for deterministic diagnosis but do not fully measure open-ended financial answer quality."
+  ]
+}

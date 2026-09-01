@@ -1,0 +1,113 @@
+{
+  "decision_id": "econochart_final_model_20260901",
+  "status": "completed",
+  "decided_on": "2026-09-01",
+  "project_state": "closed_no_further_training",
+  "selected_model": {
+    "display_name": "EconoChart GRPO R1",
+    "base_model": "Qwen/Qwen3-VL-4B-Instruct",
+    "adapter_stage": "grpo",
+    "adapter_path": "outputs/grpo_qlora_48g_domain_v1/final_adapter",
+    "adapter_sha256": "d47c083114e26000c1df5bd52676a1ca9dc2ca708a70c7944c97b3824404486b",
+    "standalone_weights": false,
+    "load_contract": "Load the frozen Qwen3-VL-4B-Instruct base, then attach the GRPO LoRA adapter."
+  },
+  "training_chain": [
+    "Qwen3-VL-4B-Instruct",
+    "domain QLoRA SFT on 9,600 rows for 2 epochs",
+    "GRPO R1 on 3,600 prompts with 4 generations (14,400 rollouts)"
+  ],
+  "selection_type": "project_delivery_checkpoint",
+  "selection_rationale": [
+    "It is the terminal, fully saved and reload-audited artifact of the intended Base-to-SFT-to-GRPO research chain.",
+    "Its internal performance is statistically indistinguishable from the strong domain-SFT control rather than demonstrably worse.",
+    "Selecting it demonstrates the implemented RL training and recovery path, but does not change the statistical attribution boundary."
+  ],
+  "audited_internal_metrics": {
+    "rows": 2496,
+    "overall": 0.806343,
+    "numeric": 0.593353,
+    "numeric_recall": 0.567141,
+    "numeric_precision": 0.692619,
+    "trend": 0.958716,
+    "evidence": 0.999366,
+    "risk": 0.689895,
+    "format": 1.0,
+    "length": 1.0,
+    "hard_overall": 0.75414
+  },
+  "paired_attribution": {
+    "sft_to_grpo_overall_delta": -0.000157,
+    "sft_to_grpo_bootstrap_95_ci": [-0.002294, 0.002112],
+    "incremental_grpo_gain_established": false,
+    "incremental_grpo_regression_established": false,
+    "base_to_grpo_cumulative_overall_delta": 0.456563,
+    "base_to_grpo_is_cumulative_sft_plus_grpo": true
+  },
+  "audited_external_metrics": {
+    "rows": 4446,
+    "overall_exact_match": 0.448493,
+    "overall_relaxed_accuracy": 0.536207,
+    "conclusion": "NO_EXTERNAL_GAIN",
+    "external_repair_established": false
+  },
+  "rl_evidence": {
+    "train_steps": 3600,
+    "prompts": 3600,
+    "generations_per_prompt": 4,
+    "rollouts": 14400,
+    "reward_components": ["numeric", "trend", "format", "evidence", "risk", "length"],
+    "beta": 0.001,
+    "epsilon": 0.2,
+    "loss_type": "dr_grpo",
+    "trainable_tensors": 504,
+    "trainable_parameters": 33030144,
+    "all_adapter_tensors_changed_from_sft_start": true,
+    "checkpoint_recovery_audited": true,
+    "final_adapter_reload": "PASS"
+  },
+  "non_promoted_candidate": {
+    "name": "sft_qlora_r16_domain_chartqa_v1",
+    "relationship": "Independent Base-to-mixed-SFT ablation; not trained from GRPO or domain-SFT.",
+    "reason": "ChartQA exact improved, but the registered ChartQAPro relaxed non-inferiority guardrail failed and internal retention was not run after early stop.",
+    "mmefinance_role": "Its Base-paired MME-Finance result is diagnostic future-work evidence, not evidence about the selected GRPO adapter."
+  },
+  "future_work_not_run": [
+    {
+      "priority": 1,
+      "proposal": "Mixed-SFT to recall-repair GRPO pilot",
+      "reason": "Preserve the observed ChartQA/OCR/efficiency gains while addressing the verified MME-Finance numeric-recall regression.",
+      "first_run": "300-step pilot from the mixed-SFT adapter; do not launch a full 3,600-step run first.",
+      "reward_change": "Replace the equal-weight numeric F1 objective with a recall-biased F2 objective while retaining supported-number precision.",
+      "registered_guardrails": {
+        "internal_numeric_recall_delta_min": 0.03,
+        "internal_overall_delta_min": -0.01,
+        "internal_numeric_precision_delta_min": -0.02,
+        "unsupported_number_or_output_behavior_regression": "FAIL"
+      },
+      "evaluation_boundary": "Choose the pilot using frozen internal validation only; keep ChartQAPro and MME-Finance as held-out confirmation rather than tuning surfaces."
+    },
+    {
+      "priority": 2,
+      "proposal": "Vision/projector ablation",
+      "reason": "If audited failures localize to OCR, dense labels, or axis reading, separately unfreeze the projector before considering the full vision tower."
+    },
+    {
+      "priority": 3,
+      "proposal": "Human preference or image-aware judge evaluation",
+      "reason": "Open-ended financial advice and evidence quality are not fully captured by deterministic surrogate metrics."
+    }
+  ],
+  "claim_boundary": {
+    "allowed": "Completed a full, auditable SFT-to-GRPO workflow and selected its terminal checkpoint as the project delivery artifact.",
+    "not_allowed": "Claim that GRPO produced a statistically significant incremental gain over SFT or that the model achieved an official MME-Finance score.",
+    "production_readiness": "Not established; external generalization and open-ended qualitative limitations remain documented."
+  },
+  "evidence": {
+    "grpo_internal": "experiments/results/20260828_grpo_internal_summary.json",
+    "external_generalization": "experiments/results/20260830_external_generalization_summary.json",
+    "mixed_sft": "experiments/results/20260831_s5_public_mix_result_summary.json",
+    "mmefinance": "experiments/results/20260901_mmefinance_pair_summary.json",
+    "model_card": "docs/final_model_card.md"
+  }
+}

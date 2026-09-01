@@ -89,11 +89,14 @@ SFT 优先保留全部图片和企业覆盖、减少同一图的重复问题；G
 |---|---|---|---|
 | ChartQA | GPL-3.0 | train/val 可做混合 SFT 消融；test 固定外部评测 | test 不训练、不选参 |
 | ChartQAPro | MIT | test-only 高难挑战集 | 全部禁止训练和选参 |
+| MME-Finance English open main | CC BY-NC 4.0 | 1,171 条开放式金融多模态 evaluation-only 诊断；导出官方 image-aware judge 输入 | 全部禁止训练、早停和选参；本地 `surrogate_*` 不冒充官方分数 |
 | PlotQA | CC-BY-4.0 | 后续可选的数值推理扩展 | 不属于最小闭环 |
 
 本仓库不重新分发公开数据。准备代码从官方 Hugging Face 数据源读取并在本地生成统一 annotation。ChartQAPro 的多轮样本保留历史问答作为上下文，只预测最后一轮，并导出官方评测格式。原始 `Year` 序列作为答案元数据完整保留，不强制与问答轮数等长；若官方最终目标 `Answer[-1]` 为空，该源行会被确定性排除且不回填，绝不伪造标签。`manifest.json` 同时记录 selected source/evaluable 数量、被排除的源索引与记录 ID、Year 长度异常及保留情况，所生成的是固定可评分子集，不能冒充未经排除的完整官方 test。
 
 ChartQA 准备阶段按规范化 PNG 的完整 SHA-256 检查跨 split 图像重复。固定外部 test 完整保留；先从 validation 删除与 test 同图的全部问答，再从可选 train 删除与清理后 validation 或 test 同图的全部问答，两个可变 split 均不回填。删除前后数量、冲突哈希、分 split 样本 ID、未引用图片文件和最终零重叠检查写入 `manifest.json` 的 `split_decontamination`。
+
+MME-Finance 使用固定 revision 的英文开放式主集，保留任务类别、图像类型、图像样式、背景、参考答案与原始 source index。数据准备审计 1,171 条连续 ID、缺图/重复/字段完整性和 TSV/ZIP/有序记录哈希；评测保存逐条 prediction 与 image-aware judge 输入，但这些大工件不进 Git。项目已完成 Base 与 mixed-SFT 的同 ID 配对诊断：部分字符串相似度和效率指标改善，数值召回可靠下降。由于官方视觉裁判未运行，公开 summary 只能称这些结果为 surrogate diagnostics。
 
 如果发布混合训练后的 adapter 或派生数据，应在发布前重新核对数据集条款与目标平台要求；本数据卡不是法律意见。
 
@@ -106,7 +109,7 @@ ChartQA 准备阶段按规范化 PNG 的完整 SHA-256 检查跨 split 图像重
 - 自动 reward 只能检查被编码的事实，无法完整衡量建议质量和自然语言合理性。
 - 指标局部窗口能降低数字错配，但仍不能完整解析复杂自然语言中的主谓与时点关系。
 
-因此项目必须同时报告 EconoChart 内部测试、ChartQA、ChartQAPro、典型错误案例和人工抽检，不能只凭合成测试总分宣称真实业务能力。
+因此项目必须同时报告 EconoChart 内部测试、ChartQA、ChartQAPro、MME-Finance 的评分边界、典型错误案例和未完成的人工抽检，不能只凭合成测试总分或某个 surrogate 均值宣称真实业务能力。
 
 ## 复现
 

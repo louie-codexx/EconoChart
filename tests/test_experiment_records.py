@@ -372,6 +372,103 @@ class ExperimentRecordTests(unittest.TestCase):
         for value in summary["hashes"].values():
             self.assertEqual(len(value), 64)
 
+    def test_mmefinance_summary_preserves_score_contract_and_recall_regression(self):
+        summary = load_json(
+            RESULTS / "20260901_mmefinance_pair_summary.json"
+        )
+        benchmark = summary["benchmark"]
+        metrics = summary["paired_metrics"]
+        decision = summary["decision"]
+
+        self.assertEqual(summary["status"], "passed")
+        self.assertEqual(benchmark["rows"], 1171)
+        self.assertEqual(summary["comparison"]["paired_rows"], 1171)
+        self.assertFalse(benchmark["official_image_aware_judge_run"])
+        self.assertFalse(decision["official_score_claimed"])
+        self.assertFalse(decision["broad_finance_improvement_claimed"])
+        self.assertFalse(decision["candidate_promoted"])
+        self.assertFalse(
+            summary["comparison"]["candidate"]["is_project_final_model"]
+        )
+
+        for name in (
+            "surrogate_exact_match",
+            "surrogate_anls",
+            "surrogate_token_f1",
+        ):
+            self.assertGreater(metrics[name]["bootstrap_95_ci"][0], 0, name)
+
+        numeric_precision = metrics["surrogate_numeric_precision"]
+        self.assertLess(numeric_precision["bootstrap_95_ci"][0], 0)
+        self.assertGreater(numeric_precision["bootstrap_95_ci"][1], 0)
+
+        numeric_recall = metrics["surrogate_numeric_recall"]
+        self.assertEqual(numeric_recall["rows"], 839)
+        self.assertEqual(numeric_recall["baseline_mean"], 0.699934)
+        self.assertEqual(numeric_recall["candidate_mean"], 0.282634)
+        self.assertLess(numeric_recall["delta"], 0)
+        self.assertLess(numeric_recall["bootstrap_95_ci"][1], 0)
+        self.assertEqual(metrics["output_nonempty"]["candidate_mean"], 1.0)
+        self.assertIn("future_hypothesis_not_run", decision)
+        self.assertIn("300-step", decision["future_hypothesis_not_run"])
+
+        for hashes in (summary["input_hashes"], summary["artifact_hashes"]):
+            for value in hashes.values():
+                self.assertEqual(len(value), 64)
+
+    def test_final_model_selection_is_grpo_without_incremental_overclaim(self):
+        decision = load_json(
+            RESULTS / "20260901_final_model_decision.json"
+        )
+        grpo = load_json(RESULTS / "20260828_grpo_internal_summary.json")
+        external = load_json(
+            RESULTS / "20260830_external_generalization_summary.json"
+        )
+        selected = decision["selected_model"]
+        attribution = decision["paired_attribution"]
+
+        self.assertEqual(decision["status"], "completed")
+        self.assertEqual(decision["project_state"], "closed_no_further_training")
+        self.assertEqual(selected["adapter_stage"], "grpo")
+        self.assertEqual(
+            selected["adapter_path"],
+            "outputs/grpo_qlora_48g_domain_v1/final_adapter",
+        )
+        self.assertEqual(selected["adapter_sha256"], grpo["adapter"]["sha256"])
+        self.assertEqual(decision["audited_internal_metrics"]["rows"], 2496)
+        recorded_internal = {
+            key: value
+            for key, value in decision["audited_internal_metrics"].items()
+            if key != "rows"
+        }
+        self.assertEqual(recorded_internal, grpo["metrics"])
+        recorded_external = decision["audited_external_metrics"]
+        source_external = external["models"]["grpo"]["metrics"]["overall"]
+        self.assertEqual(
+            recorded_external["overall_exact_match"],
+            source_external["exact_match"],
+        )
+        self.assertEqual(
+            recorded_external["overall_relaxed_accuracy"],
+            source_external["relaxed_accuracy"],
+        )
+        self.assertFalse(attribution["incremental_grpo_gain_established"])
+        self.assertFalse(attribution["incremental_grpo_regression_established"])
+        self.assertTrue(attribution["base_to_grpo_is_cumulative_sft_plus_grpo"])
+        self.assertEqual(decision["rl_evidence"]["train_steps"], 3600)
+        self.assertEqual(decision["rl_evidence"]["rollouts"], 14400)
+        self.assertEqual(decision["rl_evidence"]["final_adapter_reload"], "PASS")
+        self.assertIn(
+            "Independent Base-to-mixed-SFT",
+            decision["non_promoted_candidate"]["relationship"],
+        )
+        self.assertTrue(decision["future_work_not_run"])
+        self.assertIn(
+            "not_allowed", decision["claim_boundary"]
+        )
+        for path in decision["evidence"].values():
+            self.assertTrue((ROOT / path).is_file(), path)
+
     def test_matrix_points_to_reviewed_summaries_and_closes_r1(self):
         matrix = yaml.safe_load(
             (ROOT / "experiments" / "experiment_matrix.yaml").read_text(
@@ -445,27 +542,64 @@ class ExperimentRecordTests(unittest.TestCase):
         self.assertIn("did not establish", reward_ablation["result"])
         self.assertIn("was not run", reward_ablation["decision"])
 
+        mmefinance = experiments["E1_mmefinance_open_pair"]
+        self.assertEqual(mmefinance["status"], "completed")
+        self.assertEqual(mmefinance["role"], "evaluation_only")
+        self.assertEqual(mmefinance["rows"], 1171)
+        self.assertTrue((ROOT / mmefinance["evidence"]).is_file())
+        self.assertIn("0.699934 to 0.282634", mmefinance["result"])
+        self.assertIn("official image-aware judge was not run", mmefinance["score_boundary"])
+
+        final = experiments["F0_final_model_selection"]
+        self.assertEqual(final["status"], "completed")
+        self.assertEqual(
+            final["selected_adapter"],
+            "outputs/grpo_qlora_48g_domain_v1/final_adapter",
+        )
+        self.assertEqual(len(final["selected_adapter_sha256"]), 64)
+        self.assertTrue((ROOT / final["evidence"]).is_file())
+        self.assertTrue((ROOT / final["model_card"]).is_file())
+        self.assertIn("not completed experiments", final["future_work"])
+
     def test_public_docs_keep_external_and_measurement_boundaries_explicit(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         data_card = (ROOT / "docs" / "data_card.md").read_text(encoding="utf-8")
         runbook = (ROOT / "docs" / "autodl_runbook.md").read_text(encoding="utf-8")
         interview = (ROOT / "docs" / "interview_guide.md").read_text(encoding="utf-8")
         protocol = (ROOT / "docs" / "experiment_protocol.md").read_text(encoding="utf-8")
+        model_card = (ROOT / "docs" / "final_model_card.md").read_text(
+            encoding="utf-8"
+        )
 
         self.assertIn("结论为 `NO_EXTERNAL_GAIN`", readme)
         self.assertIn("结论为 `EXTERNAL_GUARDRAIL_FAILED`", readme)
         self.assertIn("20260830_external_generalization_summary.json", readme)
         self.assertIn("20260831_s5_public_mix_result_summary.json", readme)
+        self.assertIn("20260901_final_model_decision.json", readme)
+        self.assertIn("20260901_mmefinance_pair_summary.json", readme)
+        self.assertIn("0.699934", readme)
+        self.assertIn("0.282634", readme)
         self.assertNotIn("待模型外评", interview)
         self.assertIn("0.701600 / 0.791200", interview)
         self.assertIn("Mixed-SFT（S5）", interview)
+        self.assertIn("0.699934", interview)
+        self.assertIn("0.282634", interview)
+        self.assertIn("没有实际运行", interview)
         self.assertIn("不能追溯改写", protocol)
         self.assertIn("未建立非劣", protocol)
         self.assertIn("Answer[-1]", data_card)
         self.assertIn("确定性排除且不回填", data_card)
+        self.assertIn("MME-Finance English open main", data_card)
+        self.assertIn("surrogate diagnostics", data_card)
         self.assertIn("selected source 与 evaluable 行数", runbook)
         self.assertIn("s5_public_mix_inputs_summary.json", runbook)
         self.assertIn("s5_public_mix_result_summary.json", runbook)
+        self.assertIn("无需再向 AutoDL 提交训练命令", runbook)
+        self.assertIn(
+            "outputs/grpo_qlora_48g_domain_v1/final_adapter", model_card
+        )
+        self.assertIn("没有建立 GRPO 的独立增益", model_card)
+        self.assertIn("不是官方 MME-Finance 分数", model_card)
 
 
 if __name__ == "__main__":
