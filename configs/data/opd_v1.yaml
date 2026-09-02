@@ -53,6 +53,9 @@ selection:
   max_records_per_chart: 2
   dual_rollout_fraction: 0.20
   verify_image_content: true
+  # Preserve the desired mix where possible, cap tasks at their frozen unseen
+  # capacity, and redistribute deficits without duplicating or oversampling rows.
+  task_quota_policy: cap_and_redistribute
   task_weights:
     numerical_reasoning: 0.25
     value_retrieval: 0.20

@@ -20,7 +20,7 @@ distillation，而不是把教师完整回答当作新的 SFT 固定答案。
 
 ## 冻结边界
 
-- 训练 prompt 只来自未参与 SFT/GRPO 的 train 记录；round 1 为 3,000 个 prompt，其中 20% hard prompt 生成两个 rollout，共 3,600 条。
+- 训练 prompt 只来自未参与 SFT/GRPO 的 train 记录；round 1 为 3,000 个 prompt，其中 20% hard prompt 生成两个 rollout，共 3,600 条。任务配比先按目标权重分配；若某类冻结未见数据不足，则封顶于真实容量并把缺口按原权重确定性分配给仍有容量的类别，不复制、不过采样。manifest 同时记录目标配额、可用分布、有效配额和调整量。
 - val 被一次性按图片组拆成教师资格 256 条和 OPD development 256 条；同一图片或同内容哈希图片不能跨面板。
 - internal final test、ChartQA、ChartQAPro、MME-Finance 不参与教师选择、prompt 筛选、训练或 round 晋级。
 - round 1 更新后必须重新生成 rollout 才能称为 round 2；旧 score 不可重复使用。

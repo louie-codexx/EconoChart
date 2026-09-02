@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
 
 from econochart.config import ROOT, load_config
@@ -50,6 +51,45 @@ class OpdPipelineTests(unittest.TestCase):
             13_200,
         )
         self.assertEqual(sum(config["selection"]["round_rows"]), 6_000)
+        self.assertEqual(config["selection"]["task_quota_policy"], "cap_and_redistribute")
+
+    def test_capacity_policy_redistributes_scarce_task_quota_without_duplicates(self) -> None:
+        rows = [
+            _record(
+                f"scarce-{index:02d}",
+                split="train",
+                chart=f"scarce-chart-{index:02d}",
+                task="trend_analysis" if index < 2 else "value_retrieval",
+            )
+            for index in range(12)
+        ]
+
+        with self.assertRaisesRegex(ValueError, "task quotas are infeasible"):
+            select_opd_records(
+                rows,
+                excluded_ids=set(),
+                round_rows=[4, 4],
+                task_weights={"trend_analysis": 0.5, "value_retrieval": 0.5},
+                seed=20260821,
+                max_records_per_chart=1,
+            )
+
+        first, second = select_opd_records(
+            rows,
+            excluded_ids=set(),
+            round_rows=[4, 4],
+            task_weights={"trend_analysis": 0.5, "value_retrieval": 0.5},
+            seed=20260821,
+            max_records_per_chart=1,
+            task_quota_policy="cap_and_redistribute",
+        )
+
+        selected = [*first, *second]
+        self.assertEqual(
+            Counter(row["task_type"] for row in selected),
+            {"trend_analysis": 2, "value_retrieval": 6},
+        )
+        self.assertEqual(len({row["id"] for row in selected}), 8)
 
     def test_selection_is_deterministic_unseen_and_chart_capped(self) -> None:
         rows = [
@@ -289,6 +329,22 @@ class OpdPipelineTests(unittest.TestCase):
             self.assertEqual(manifest["artifacts"]["teacher_qualification"]["rows"], 2)
             self.assertEqual(manifest["artifacts"]["development"]["rows"], 2)
             self.assertEqual(manifest["artifacts"]["round_1"]["rollout_count_distribution"], {"1": 4, "2": 2})
+            self.assertEqual(
+                manifest["selection"]["available_unseen_task_distribution"],
+                {"numerical_reasoning": 10, "risk_diagnosis": 10},
+            )
+            self.assertEqual(
+                manifest["selection"]["requested_task_quotas"],
+                {"numerical_reasoning": 6, "risk_diagnosis": 6},
+            )
+            self.assertEqual(
+                manifest["selection"]["effective_task_quotas"],
+                manifest["selection"]["requested_task_quotas"],
+            )
+            self.assertEqual(
+                manifest["selection"]["task_quota_adjustments"],
+                {"numerical_reasoning": 0, "risk_diagnosis": 0},
+            )
             stored = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
             self.assertNotIn("manifest_sha256", stored)
 

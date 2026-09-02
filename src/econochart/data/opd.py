@@ -84,6 +84,56 @@ def _validate_unique_ids(records: Sequence[dict[str, Any]], *, label: str) -> No
         raise ValueError(f"OPD {label} contains duplicate IDs; first={duplicates[:3]}")
 
 
+def _allocate_task_quotas(
+    task_weights: dict[str, int | float],
+    total: int,
+    available_tasks: Counter[str],
+    *,
+    policy: str,
+) -> dict[str, int]:
+    if policy not in {"strict", "cap_and_redistribute"}:
+        raise ValueError(f"Unsupported OPD task quota policy: {policy}")
+    requested = _largest_remainder(task_weights, total)
+    infeasible = {
+        task: {"required": quota, "available": available_tasks.get(task, 0)}
+        for task, quota in requested.items()
+        if available_tasks.get(task, 0) < quota
+    }
+    if not infeasible:
+        return requested
+    if policy == "strict":
+        raise ValueError(f"OPD task quotas are infeasible: {infeasible}")
+
+    quotas = {
+        task: min(quota, available_tasks.get(task, 0))
+        for task, quota in requested.items()
+    }
+    remaining = total - sum(quotas.values())
+    while remaining:
+        eligible_weights = {
+            task: weight
+            for task, weight in task_weights.items()
+            if quotas.get(task, 0) < available_tasks.get(task, 0)
+        }
+        if not eligible_weights:
+            available = {task: available_tasks.get(task, 0) for task in task_weights}
+            raise ValueError(
+                f"OPD task quota capacity is below {total} rows: selected={sum(quotas.values())}, "
+                f"available={available}"
+            )
+        proposed = _largest_remainder(eligible_weights, remaining)
+        added = 0
+        for task in sorted(proposed):
+            capacity = available_tasks.get(task, 0) - quotas.get(task, 0)
+            increment = min(proposed[task], capacity)
+            quotas[task] = quotas.get(task, 0) + increment
+            added += increment
+        if added == 0:
+            raise RuntimeError("OPD task quota redistribution made no progress")
+        remaining -= added
+    return quotas
+
+
 def select_opd_records(
     records: Sequence[dict[str, Any]],
     *,
@@ -92,8 +142,9 @@ def select_opd_records(
     task_weights: dict[str, int | float],
     seed: int,
     max_records_per_chart: int,
+    task_quota_policy: str = "strict",
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Select unseen train prompts with exact task quotas and coverage-first chart use."""
+    """Select unseen train prompts with audited task quotas and coverage-first chart use."""
     if len(round_rows) != 2 or any(int(value) <= 0 for value in round_rows):
         raise ValueError("selection.round_rows must contain two positive integers")
     if max_records_per_chart < 1:
@@ -106,15 +157,13 @@ def select_opd_records(
     if len(candidates) < total:
         raise ValueError(f"OPD requires {total} unseen prompts, but only {len(candidates)} remain")
 
-    task_quotas = _largest_remainder(task_weights, total)
     available_tasks = Counter(str(row["task_type"]) for row in candidates)
-    infeasible = {
-        task: {"required": quota, "available": available_tasks.get(task, 0)}
-        for task, quota in task_quotas.items()
-        if available_tasks.get(task, 0) < quota
-    }
-    if infeasible:
-        raise ValueError(f"OPD task quotas are infeasible: {infeasible}")
+    task_quotas = _allocate_task_quotas(
+        task_weights,
+        total,
+        available_tasks,
+        policy=task_quota_policy,
+    )
 
     heaps: dict[str, list[tuple[int, int, str, dict[str, Any]]]] = {task: [] for task in task_quotas}
     for row in candidates:
@@ -399,6 +448,7 @@ def build_opd_subsets(config: dict[str, Any], *, force: bool = False) -> dict[st
         task_weights=selection["task_weights"],
         seed=seed,
         max_records_per_chart=int(selection["max_records_per_chart"]),
+        task_quota_policy=str(selection.get("task_quota_policy", "strict")),
     )
     round_1 = _annotate_round(
         round_1,
@@ -413,6 +463,10 @@ def build_opd_subsets(config: dict[str, Any], *, force: bool = False) -> dict[st
         seed=seed,
     )
     all_training = [*round_1, *round_2]
+    unseen_candidates = [row for row in train if str(row["id"]) not in seen_ids]
+    available_task_distribution = Counter(str(row["task_type"]) for row in unseen_candidates)
+    requested_task_quotas = _largest_remainder(selection["task_weights"], len(all_training))
+    effective_task_quotas = Counter(str(row["task_type"]) for row in all_training)
     verify_image_content = bool(selection.get("verify_image_content", False))
     image_hash_cache: dict[Path, str] = {}
     leakage = assert_no_forbidden_overlap(
@@ -491,6 +545,14 @@ def build_opd_subsets(config: dict[str, Any], *, force: bool = False) -> dict[st
             "verify_image_content": verify_image_content,
             "qualification_panel_grouping": "image_sha256" if verify_image_content else "image_path",
             "task_weights": selection["task_weights"],
+            "task_quota_policy": selection.get("task_quota_policy", "strict"),
+            "available_unseen_task_distribution": dict(sorted(available_task_distribution.items())),
+            "requested_task_quotas": dict(sorted(requested_task_quotas.items())),
+            "effective_task_quotas": dict(sorted(effective_task_quotas.items())),
+            "task_quota_adjustments": {
+                task: effective_task_quotas.get(task, 0) - requested_task_quotas.get(task, 0)
+                for task in sorted(requested_task_quotas)
+            },
         },
         "leakage": leakage,
         "training_to_qualification_leakage": training_to_qualification,
