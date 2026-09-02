@@ -43,7 +43,9 @@ distillation，而不是把教师完整回答当作新的 SFT 固定答案。
 教师模型下载出现 `27/27` 和 exit code 0 后，先让 96GB 实例保持**无卡模式**。在克隆实例中执行以下命令；它们只读取磁盘、计算 SHA256 和 safetensors header，不加载 CUDA：
 
 ```bash
-set -euo pipefail
+(
+set -Eeuo pipefail
+trap 'code=$?; echo "OPD_NO_GPU_GATE_FAILED exit_code=$code command=$BASH_COMMAND" >&2' ERR
 cd /root/autodl-tmp/EconoChart
 git pull --ff-only origin main
 
@@ -83,6 +85,7 @@ mkdir -p outputs/opd/model_audits
   --student-model-dir /root/autodl-tmp/models/Qwen3-VL-4B-Instruct \
   --teacher-model-dir /root/autodl-tmp/models/Qwen3-VL-32B-Instruct \
   --output outputs/opd/model_audits/qwen3vl4b_to_qwen3vl32b_compatibility.json
+)
 ```
 
 该门不使用 `--force`：如果同名工件已存在，应先审计旧工件，而不是静默覆盖。只有数据 manifest 的泄漏计数全部为 0、两份模型报告均为 `OPD_MODEL_SNAPSHOT_AUDIT_PASS`、接口报告为 `OPD_MODEL_INTERFACE_COMPATIBILITY_PASS`，才安排第一次 GPU 资格推理。任一步非零退出时立即停止并保留原输出；不要打开另一台 GPU 补跑。

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
@@ -136,6 +137,7 @@ class OpdArtifactTests(unittest.TestCase):
                 )
 
 
+@unittest.skipUnless(importlib.util.find_spec("torch"), "requires the optional training dependency: torch")
 class OpdLossTests(unittest.TestCase):
     def test_sparse_forward_kl_is_zero_for_matching_distribution_and_has_finite_gradients(self) -> None:
         import torch
