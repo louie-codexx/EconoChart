@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from econochart.config import ROOT
+from econochart.config import ROOT, load_config
 from econochart.data.opd import (
     assert_no_forbidden_overlap,
     build_opd_subsets,
@@ -41,6 +41,16 @@ def _record(record_id: str, *, split: str, chart: str, task: str, image: str | N
 
 
 class OpdPipelineTests(unittest.TestCase):
+    def test_production_budget_matches_the_frozen_training_split(self) -> None:
+        config = load_config("configs/data/opd_v1.yaml")
+
+        self.assertEqual(config["data"]["train_source"]["expected_rows"], 19_200)
+        self.assertEqual(
+            sum(source["expected_rows"] for source in config["data"]["seen_sources"]),
+            13_200,
+        )
+        self.assertEqual(sum(config["selection"]["round_rows"]), 6_000)
+
     def test_selection_is_deterministic_unseen_and_chart_capped(self) -> None:
         rows = [
             _record(

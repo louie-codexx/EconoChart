@@ -10,7 +10,7 @@ data:
   source_manifest_sha256: a7aba20b3fccd2c3740f3873f327e525bb3b224a5722128b5de52cd1f28f7baa
   train_source:
     path: data/generated/econochart_v2/annotations/train.jsonl
-    expected_rows: 24000
+    expected_rows: 19200
     expected_split: train
   seen_sources:
     - path: data/generated/econochart_v2/subsets/sft_train_9600.jsonl
