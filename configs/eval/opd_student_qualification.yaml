@@ -1,0 +1,44 @@
+experiment:
+  id: opd_teacher_qualification_student_grpo4b_v1
+  checkpoint_stage: grpo_r1_student_baseline
+  role: opd_teacher_qualification_baseline
+
+seed: 20260821
+
+model:
+  name_or_path: Qwen/Qwen3-VL-4B-Instruct
+  adapter_path: outputs/grpo_qlora_48g_domain_v1/final_adapter
+  expected_adapter_sha256: d47c083114e26000c1df5bd52676a1ca9dc2ca708a70c7944c97b3824404486b
+  dtype: bfloat16
+  min_pixels: 200704
+  max_pixels: 802816
+  quantization:
+    mode: 4bit
+    quant_type: nf4
+    compute_dtype: bfloat16
+    double_quant: true
+
+data:
+  test:
+    - path: data/generated/econochart_v2/opd_v1/teacher_qualification_256.jsonl
+      expected_rows: 256
+
+generation:
+  max_new_tokens: 256
+  do_sample: false
+  repetition_penalty: 1.0
+
+evaluation:
+  # Teacher selection uses validation data only. Never repoint this file at final test data.
+  expected_split: val
+  save_every: 25
+  reward_weights:
+    numeric: 0.35
+    trend: 0.20
+    format: 0.15
+    evidence: 0.15
+    risk: 0.10
+    length: 0.05
+
+training:
+  output_dir: outputs/opd/teacher_qualification_v1/student_grpo4b

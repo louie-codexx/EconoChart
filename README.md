@@ -4,7 +4,7 @@
 
 EconoChart 不把“跑一次 LoRA”当作项目结论，而是建立一条可审计的实验链：无泄漏数据 → base 基线 → LoRA/QLoRA SFT → 分能力评测与消融 → 可验证 GRPO → 失败复盘。目标能力包括图表理解、数值推理、经营风险诊断和证据约束的决策建议。
 
-> 当前状态（2026-09-01）：项目已关闭，不再启动新增训练。交付模型固定为 `Qwen3-VL-4B-Instruct` 加载 `outputs/grpo_qlora_48g_domain_v1/final_adapter`，主线为 `Base → Domain SFT → GRPO R1`。GRPO 完成 3,600 step、14,400 次 rollout 后，在固定 2,496 条内部测试上保持 `0.806343` 的强 SFT 水平；相对 SFT 的成对变化为 `-0.000157`、95% CI `[-0.002294, 0.002112]`，未建立统计可确认的退化。Base→最终 GRPO 的累计 overall 提升为 `+0.456563`，其中包含 SFT 与 GRPO 两阶段贡献。固定 4,446 条 ChartQA/ChartQAPro 外评结论为 `NO_EXTERNAL_GAIN`。并行 mixed-SFT 的 ChartQA exact 提升 `+0.062000`，但未通过 ChartQAPro relaxed 非劣门，故结论为 `EXTERNAL_GUARDRAIL_FAILED`、不晋升。MME-Finance 1,171 条 Base→mixed-SFT 配对流水线和最终审计均通过：surrogate exact/ANLS/token-F1 与效率改善，但 numeric recall 从 `0.699934` 降至 `0.282634`；这些是后续优化诊断，不是官方 MME-Finance 分数，也没有评测最终 GRPO adapter。
+> 当前状态（2026-09-02）：已审计的交付模型仍固定为 `Qwen3-VL-4B-Instruct` 加载 `outputs/grpo_qlora_48g_domain_v1/final_adapter`，主线为 `Base → Domain SFT → GRPO R1`。项目已在不改写历史结果的前提下重开一个候选 OPD 阶段；当前仅完成多模态数据隔离、教师资格门、双机工件契约、断点审计和 CPU 回归，尚未产生 OPD adapter 或能力结论。GRPO 完成 3,600 step、14,400 次 rollout 后，在固定 2,496 条内部测试上保持 `0.806343` 的强 SFT 水平；相对 SFT 的成对变化为 `-0.000157`、95% CI `[-0.002294, 0.002112]`，未建立统计可确认的退化。Base→最终 GRPO 的累计 overall 提升为 `+0.456563`，其中包含 SFT 与 GRPO 两阶段贡献。固定 4,446 条 ChartQA/ChartQAPro 外评结论为 `NO_EXTERNAL_GAIN`。并行 mixed-SFT 的 ChartQA exact 提升 `+0.062000`，但未通过 ChartQAPro relaxed 非劣门，故结论为 `EXTERNAL_GUARDRAIL_FAILED`、不晋升。MME-Finance 1,171 条 Base→mixed-SFT 配对流水线和最终审计均通过：surrogate exact/ANLS/token-F1 与效率改善，但 numeric recall 从 `0.699934` 降至 `0.282634`；这些是后续优化诊断，不是官方 MME-Finance 分数，也没有评测最终 GRPO adapter。
 
 ## 最终交付模型
 
@@ -16,11 +16,17 @@ EconoChart 不把“跑一次 LoRA”当作项目结论，而是建立一条可�
 | adapter SHA-256 | `d47c083114e26000c1df5bd52676a1ca9dc2ca708a70c7944c97b3824404486b` |
 | 训练链 | 9,600-row domain QLoRA SFT → 3,600-step GRPO、14,400 rollouts |
 | 内部 overall | `0.806343` |
-| 项目状态 | 已收束；无需再提交训练命令 |
+| 项目状态 | GRPO R1 为当前 incumbent；OPD 候选处于 code-ready/审计阶段 |
 
 该 adapter 不是独立权重，部署时必须同时加载同一基座。选择 GRPO R1 作为项目交付终点，只表示完整、可重载的 SFT→RL 工件已经完成；能力归因仍严格服从 SFT→GRPO 配对置信区间。
 
 完整审计证据：[GRPO 内部摘要](experiments/results/20260828_grpo_internal_summary.json)、[公开外评摘要](experiments/results/20260830_external_generalization_summary.json)、[Mixed-SFT 摘要](experiments/results/20260831_s5_public_mix_result_summary.json)、[MME-Finance 摘要](experiments/results/20260901_mmefinance_pair_summary.json)、[最终选择摘要](experiments/results/20260901_final_model_decision.json) 与 [最终模型卡](docs/final_model_card.md)。
+
+## 当前候选研究：多模态 OPD
+
+OPD 从冻结的 GRPO R1 学生出发，由 4B 学生先对未见过的 train prompt 生成图像感知 rollout，再由同系列 Qwen3-VL-32B 教师对**学生实际访问的相同前缀**给出 top-k token 概率，最后只更新学生 LoRA。固定答案只用于审计，不进入蒸馏目标，因此该阶段不是“教师生成答案后再做一次 SFT”。
+
+当前状态是 `code_ready`，不是 `completed`：3,000 条 round-1 prompt、600 条额外 hard rollout、256/256 教师资格与开发面板、内容级图片防泄漏、教师资格阈值和 round 晋级阈值都已在运行前冻结；GPU 前仍需完成真实数据构建、32B/4B 模型快照和 tokenizer/视觉接口审计。双机顺序、每一步的 GPU 开关和工件传输见 [双机多模态 OPD 手册](docs/opd_runbook.md)。
 
 ## 为什么这个项目不是普通微调 Demo
 
@@ -205,6 +211,7 @@ python -m ruff check .
 - [系统架构](docs/architecture.md)
 - [数据卡与公开数据许可](docs/data_card.md)
 - [AutoDL 分阶段运行手册](docs/autodl_runbook.md)
+- [双机多模态 OPD 运行手册](docs/opd_runbook.md)
 - [实验、消融、阶段门槛与停止条件](docs/experiment_protocol.md)
 - [环境兼容与预检](docs/environment.md)
 - [算法面试讲解与追问](docs/interview_guide.md)

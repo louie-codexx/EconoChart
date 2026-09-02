@@ -1,0 +1,53 @@
+experiment:
+  id: opd_round1_student_rollout_v1
+  stage: student_on_policy_rollout
+  round: 1
+
+seed: 20260821
+
+model:
+  name_or_path: Qwen/Qwen3-VL-4B-Instruct
+  adapter_path: outputs/grpo_qlora_48g_domain_v1/final_adapter
+  expected_adapter_sha256: d47c083114e26000c1df5bd52676a1ca9dc2ca708a70c7944c97b3824404486b
+  dtype: bfloat16
+  min_pixels: 200704
+  max_pixels: 802816
+  quantization:
+    mode: 4bit
+    quant_type: nf4
+    compute_dtype: bfloat16
+    double_quant: true
+
+data:
+  prompts:
+    path: data/generated/econochart_v2/opd_v1/round1_prompts_3000.jsonl
+    expected_rows: 3000
+    expected_split: train
+  opd_manifest: data/generated/econochart_v2/opd_v1/manifest.json
+
+prerequisites:
+  student_model_audit:
+    path: outputs/opd/model_audits/qwen3vl4b_snapshot.json
+    expected_gate: OPD_MODEL_SNAPSHOT_AUDIT_PASS
+  teacher_qualification:
+    path: outputs/opd/teacher_qualification_v1/paired_gate.json
+    expected_gate: OPD_TEACHER_QUALIFICATION_PASS
+  model_compatibility:
+    path: outputs/opd/model_audits/qwen3vl4b_to_qwen3vl32b_compatibility.json
+    expected_gate: OPD_MODEL_INTERFACE_COMPATIBILITY_PASS
+
+generation:
+  max_new_tokens: 256
+  do_sample: true
+  temperature: 0.8
+  top_p: 0.95
+  top_k: 0
+  repetition_penalty: 1.05
+
+rollout:
+  output_dir: outputs/opd/round1/student_rollouts
+  predictions_file: rollouts.jsonl
+  manifest_file: rollout_manifest.json
+  save_every: 10
+  expected_rollouts: 3600
+  require_image_tokens: true

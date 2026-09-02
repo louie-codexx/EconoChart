@@ -1,0 +1,18 @@
+extends: configs/eval/opd_student_qualification.yaml
+
+experiment:
+  id: opd_teacher_qualification_qwen3vl32b_v1
+  checkpoint_stage: qwen3vl32b_teacher_candidate
+  role: opd_teacher_qualification_candidate
+
+model:
+  name_or_path: Qwen/Qwen3-VL-32B-Instruct
+  adapter_path: null
+  dtype: bfloat16
+  min_pixels: 200704
+  max_pixels: 802816
+  quantization:
+    mode: none
+
+training:
+  output_dir: outputs/opd/teacher_qualification_v1/teacher_qwen3vl32b

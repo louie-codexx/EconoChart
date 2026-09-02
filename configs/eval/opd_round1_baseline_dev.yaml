@@ -1,0 +1,14 @@
+extends: configs/eval/opd_student_qualification.yaml
+
+experiment:
+  id: opd_round1_development_baseline_grpo4b_v1
+  checkpoint_stage: grpo_r1_frozen_baseline
+  role: opd_round1_development_baseline
+
+data:
+  test:
+    - path: data/generated/econochart_v2/opd_v1/opd_development_256.jsonl
+      expected_rows: 256
+
+training:
+  output_dir: outputs/opd/round1/development/grpo_baseline

@@ -1,0 +1,35 @@
+experiment:
+  id: opd_teacher_qualification_qwen3vl32b_v1
+  purpose: decide_whether_teacher_adds_capability_before_opd
+
+seed: 20260821
+bootstrap_samples: 5000
+
+inputs:
+  baseline: outputs/opd/teacher_qualification_v1/student_grpo4b/predictions.jsonl
+  candidate: outputs/opd/teacher_qualification_v1/teacher_qwen3vl32b/predictions.jsonl
+  expected_rows: 256
+  expected_split: val
+
+output: outputs/opd/teacher_qualification_v1/paired_gate.json
+
+gates:
+  required:
+    overall:
+      min_delta: 0.0
+      min_probability_positive: 0.80
+    numeric_recall:
+      min_delta: 0.02
+      min_probability_positive: 0.80
+  point_estimate_guardrails:
+    numeric: -0.03
+    trend: -0.03
+    evidence: -0.03
+    risk: -0.03
+  core_metrics: [numeric, trend, evidence, risk]
+  minimum_positive_core_metrics: 2
+
+decision:
+  pass_action: permit_multimodal_opd_smoke_only
+  fail_action: stop_before_opd_and_reconsider_teacher_or_prompt_alignment
+  thresholds_are_frozen_before_predictions: true

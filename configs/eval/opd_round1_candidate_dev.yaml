@@ -1,0 +1,12 @@
+extends: configs/eval/opd_round1_baseline_dev.yaml
+
+experiment:
+  id: opd_round1_development_candidate_v1
+  checkpoint_stage: opd_round1_student_candidate
+  role: opd_round1_development_candidate
+
+model:
+  adapter_path: outputs/opd/round1/student_update/final_adapter
+
+training:
+  output_dir: outputs/opd/round1/development/opd_candidate

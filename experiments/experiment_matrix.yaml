@@ -243,3 +243,22 @@ experiments:
     result: The terminal Base-to-domain-SFT-to-GRPO artifact is selected for delivery; no further training is scheduled.
     attribution: Selection does not establish a statistically significant GRPO gain over SFT and does not change the NO_EXTERNAL_GAIN conclusion.
     future_work: Mixed-SFT to recall-repair GRPO, projector ablation, and official/human open-answer judging are documented proposals, not completed experiments.
+
+  - id: O1_multimodal_opd_round1
+    stage: on_policy_distillation
+    status: code_ready
+    incumbent: outputs/grpo_qlora_48g_domain_v1/final_adapter
+    student_model: Qwen/Qwen3-VL-4B-Instruct
+    teacher_model: Qwen/Qwen3-VL-32B-Instruct
+    data_config: configs/data/opd_v1.yaml
+    rollout_config: configs/opd/round1_rollout_v1.yaml
+    teacher_score_config: configs/opd/round1_teacher_score_v1.yaml
+    student_train_config: configs/opd/round1_student_train_v1.yaml
+    qualification_gate: configs/opd/teacher_qualification_v1.yaml
+    development_gate: configs/opd/round1_development_gate_v1.yaml
+    protocol: docs/opd_runbook.md
+    data_budget: 3,000 unseen train prompts; 20% receive a second rollout, for 3,600 round-1 rollouts.
+    isolation: Teacher qualification and development use disjoint 256-row val panels grouped by image content; internal/public final tests are excluded from selection and training.
+    objective: Sparse forward KL over teacher top-16 probabilities plus a residual tail bucket on exact student-generated multimodal prefixes.
+    stop_condition: Do not load GPUs before model/data/interface audits; do not train if teacher qualification fails; never start round 2 automatically.
+    result: No OPD adapter or capability result exists yet. Code and frozen gates passed local CPU validation only.

@@ -1,0 +1,79 @@
+seed: 20260821
+
+experiment:
+  id: opd_qwen3vl32b_to_grpo4b_v1
+  status: data_design
+  method: asynchronous_iterative_on_policy_distillation
+
+data:
+  dataset_root: data/generated/econochart_v2
+  source_manifest_sha256: a7aba20b3fccd2c3740f3873f327e525bb3b224a5722128b5de52cd1f28f7baa
+  train_source:
+    path: data/generated/econochart_v2/annotations/train.jsonl
+    expected_rows: 24000
+    expected_split: train
+  seen_sources:
+    - path: data/generated/econochart_v2/subsets/sft_train_9600.jsonl
+      expected_rows: 9600
+      expected_split: train
+      reason: formal_domain_sft
+    - path: data/generated/econochart_v2/subsets/grpo_train_3600.jsonl
+      expected_rows: 3600
+      expected_split: train
+      reason: formal_grpo_r1
+  qualification_source:
+    path: data/generated/econochart_v2/subsets/val_512.jsonl
+    expected_rows: 512
+    expected_split: val
+  forbidden_evaluation_sources:
+    - path: data/generated/econochart_v2/annotations/test.jsonl
+      expected_rows: 2496
+      expected_split: test
+      role: frozen_internal_final_test
+    - path: data/generated/public/chartqa/annotations/test.jsonl
+      expected_rows: 2500
+      expected_split: test
+      role: frozen_external_chartqa
+      optional: true
+    - path: data/generated/public/chartqapro/annotations/test.jsonl
+      expected_rows: 1946
+      expected_split: test
+      role: frozen_external_chartqapro
+      optional: true
+    - path: data/generated/public/mmefinance/annotations/test.jsonl
+      expected_rows: 1171
+      expected_split: test
+      role: frozen_external_mmefinance
+      optional: true
+  output_dir: data/generated/econochart_v2/opd_v1
+
+selection:
+  round_rows: [3000, 3000]
+  round_2_policy: conditional_on_round_1_dev_gate
+  max_records_per_chart: 2
+  dual_rollout_fraction: 0.20
+  verify_image_content: true
+  task_weights:
+    numerical_reasoning: 0.25
+    value_retrieval: 0.20
+    relationship_analysis: 0.15
+    risk_diagnosis: 0.15
+    decision_support: 0.10
+    trend_analysis: 0.10
+    comprehensive_report: 0.05
+  qualification_rows: 256
+  development_rows: 256
+
+artifacts:
+  round_1: round1_prompts_3000.jsonl
+  round_2: round2_reserve_3000.jsonl
+  teacher_qualification: teacher_qualification_256.jsonl
+  development: opd_development_256.jsonl
+  manifest: manifest.json
+
+policy:
+  training_only: true
+  preserve_original_answers_for_audit_only: true
+  teacher_answers_are_not_sft_targets: true
+  refresh_student_rollouts_after_each_round: true
+  public_and_internal_tests_are_never_used_for_selection_or_training: true

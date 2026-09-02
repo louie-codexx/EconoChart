@@ -1,0 +1,38 @@
+experiment:
+  id: opd_round1_development_gate_v1
+  purpose: decide_whether_round1_is_promotable_without_touching_final_test
+
+seed: 20260821
+bootstrap_samples: 5000
+
+inputs:
+  baseline: outputs/opd/round1/development/grpo_baseline/predictions.jsonl
+  candidate: outputs/opd/round1/development/opd_candidate/predictions.jsonl
+  expected_rows: 256
+  expected_split: val
+
+output: outputs/opd/round1/development/paired_gate.json
+
+gates:
+  required:
+    overall:
+      min_delta: 0.01
+      min_probability_positive: 0.90
+    numeric_recall:
+      min_delta: 0.05
+      min_probability_positive: 0.90
+  point_estimate_guardrails:
+    numeric: -0.03
+    numeric_precision: -0.02
+    trend: -0.03
+    evidence: -0.03
+    risk: -0.03
+    format: -0.02
+  core_metrics: [numeric, numeric_precision, trend, evidence, risk]
+  minimum_positive_core_metrics: 3
+
+decision:
+  pass_action: promote_round1_as_final_candidate_then_manually_review_round2_cost
+  fail_action: retain_grpo_r1_as_final_and_stop_opd_expansion
+  thresholds_are_frozen_before_predictions: true
+  automatic_round_2: false

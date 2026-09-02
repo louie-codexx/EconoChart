@@ -1,0 +1,46 @@
+experiment:
+  id: opd_round1_teacher_score_v1
+  stage: teacher_scores_student_prefixes
+  round: 1
+
+seed: 20260821
+
+model:
+  name_or_path: Qwen/Qwen3-VL-32B-Instruct
+  adapter_path: null
+  dtype: bfloat16
+  min_pixels: 200704
+  max_pixels: 802816
+  quantization:
+    mode: none
+
+data:
+  prompts:
+    path: data/generated/econochart_v2/opd_v1/round1_prompts_3000.jsonl
+    expected_rows: 3000
+    expected_split: train
+  rollouts:
+    path: outputs/opd/round1/student_rollouts/rollouts.jsonl
+    manifest: outputs/opd/round1/student_rollouts/rollout_manifest.json
+    expected_rows: 3600
+
+prerequisites:
+  teacher_model_audit:
+    path: outputs/opd/model_audits/qwen3vl32b_snapshot.json
+    expected_gate: OPD_MODEL_SNAPSHOT_AUDIT_PASS
+  teacher_qualification:
+    path: outputs/opd/teacher_qualification_v1/paired_gate.json
+    expected_gate: OPD_TEACHER_QUALIFICATION_PASS
+  model_compatibility:
+    path: outputs/opd/model_audits/qwen3vl4b_to_qwen3vl32b_compatibility.json
+    expected_gate: OPD_MODEL_INTERFACE_COMPATIBILITY_PASS
+
+scoring:
+  output_dir: outputs/opd/round1/teacher_scores
+  manifest_file: teacher_score_manifest.json
+  shard_size: 50
+  top_k: 16
+  temperature: 1.0
+  expected_rollouts: 3600
+  minimum_mean_topk_mass: 0.60
+  require_exact_prompt_tokens: true

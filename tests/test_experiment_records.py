@@ -561,6 +561,15 @@ class ExperimentRecordTests(unittest.TestCase):
         self.assertTrue((ROOT / final["model_card"]).is_file())
         self.assertIn("not completed experiments", final["future_work"])
 
+        opd = experiments["O1_multimodal_opd_round1"]
+        self.assertEqual(opd["status"], "code_ready")
+        self.assertIn("No OPD adapter", opd["result"])
+        self.assertTrue((ROOT / opd["data_config"]).is_file())
+        self.assertTrue((ROOT / opd["rollout_config"]).is_file())
+        self.assertTrue((ROOT / opd["teacher_score_config"]).is_file())
+        self.assertTrue((ROOT / opd["student_train_config"]).is_file())
+        self.assertTrue((ROOT / opd["protocol"]).is_file())
+
     def test_public_docs_keep_external_and_measurement_boundaries_explicit(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         data_card = (ROOT / "docs" / "data_card.md").read_text(encoding="utf-8")
@@ -570,6 +579,7 @@ class ExperimentRecordTests(unittest.TestCase):
         model_card = (ROOT / "docs" / "final_model_card.md").read_text(
             encoding="utf-8"
         )
+        opd_runbook = (ROOT / "docs" / "opd_runbook.md").read_text(encoding="utf-8")
 
         self.assertIn("结论为 `NO_EXTERNAL_GAIN`", readme)
         self.assertIn("结论为 `EXTERNAL_GUARDRAIL_FAILED`", readme)
@@ -579,6 +589,9 @@ class ExperimentRecordTests(unittest.TestCase):
         self.assertIn("20260901_mmefinance_pair_summary.json", readme)
         self.assertIn("0.699934", readme)
         self.assertIn("0.282634", readme)
+        self.assertIn("当前候选研究：多模态 OPD", readme)
+        self.assertIn("尚未产生 OPD adapter", readme)
+        self.assertIn("OPD 候选尚未训练", model_card)
         self.assertNotIn("待模型外评", interview)
         self.assertIn("0.701600 / 0.791200", interview)
         self.assertIn("Mixed-SFT（S5）", interview)
@@ -594,12 +607,16 @@ class ExperimentRecordTests(unittest.TestCase):
         self.assertIn("selected source 与 evaluable 行数", runbook)
         self.assertIn("s5_public_mix_inputs_summary.json", runbook)
         self.assertIn("s5_public_mix_result_summary.json", runbook)
-        self.assertIn("无需再向 AutoDL 提交训练命令", runbook)
+        self.assertIn("项目重开一个独立的多模态 OPD 候选阶段", runbook)
+        self.assertIn("不会在下载完成后直接训练", runbook)
         self.assertIn(
             "outputs/grpo_qlora_48g_domain_v1/final_adapter", model_card
         )
         self.assertIn("没有建立 GRPO 的独立增益", model_card)
         self.assertIn("不是官方 MME-Finance 分数", model_card)
+        self.assertIn("--expected-shards 14", opd_runbook)
+        self.assertIn("OPD_MODEL_INTERFACE_COMPATIBILITY_PASS", opd_runbook)
+        self.assertIn("不使用 `--force`", opd_runbook)
 
 
 if __name__ == "__main__":

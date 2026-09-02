@@ -47,6 +47,7 @@ dev = [
 [project.scripts]
 econochart-build = "econochart.data.build:main"
 econochart-build-subsets = "econochart.data.subsets:main"
+econochart-build-opd = "econochart.data.opd:main"
 econochart-clean-legacy = "econochart.data.cleanup_legacy:main"
 econochart-prepare-public = "econochart.data.public:main"
 econochart-validate = "econochart.data.validate:main"
@@ -56,6 +57,13 @@ econochart-eval = "econochart.evaluation.runner:main"
 econochart-compare = "econochart.evaluation.compare:main"
 econochart-error-migration = "econochart.evaluation.error_migration:main"
 econochart-preflight = "econochart.preflight:main"
+econochart-qualify-opd-teacher = "econochart.distillation.qualification:main"
+econochart-audit-opd-model = "econochart.distillation.model_audit:main"
+econochart-check-opd-compatibility = "econochart.distillation.compatibility:main"
+econochart-opd-rollout = "econochart.distillation.rollout:main"
+econochart-opd-teacher-score = "econochart.distillation.teacher_score:main"
+econochart-opd-train = "econochart.distillation.train:main"
+econochart-qualify-opd-round = "econochart.distillation.promotion:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

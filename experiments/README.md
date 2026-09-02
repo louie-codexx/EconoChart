@@ -87,3 +87,7 @@
 - `docs/final_model_card.md`：面向部署与面试的模型卡。
 
 最终选择不会追溯改写历史实验决策。mixed-SFT、F2 numeric reward、300-step recall-repair GRPO 和 projector 解冻均是优化建议；除 mixed-SFT 本身外，后续方案没有运行，不能写成实验结果。
+
+## 2026-09-02 OPD 候选阶段
+
+项目现已重开多模态 on-policy distillation 候选研究。历史 `F0` 的聚合结果和 GRPO adapter 身份保持不变；新阶段单列为 `O1`，状态只能从 `code_ready` 经真实数据/模型门、教师资格和 GPU 工件审计逐步迁移。教师下载完成、配置写好或 CPU 测试通过都不等于训练完成，更不等于能力提升。完整冻结设计见 `docs/opd_runbook.md`。

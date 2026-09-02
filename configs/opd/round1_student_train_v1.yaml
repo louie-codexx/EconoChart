@@ -1,0 +1,80 @@
+experiment:
+  id: opd_round1_student_update_v1
+  stage: sparse_forward_kl_student_update
+  round: 1
+
+seed: 20260821
+
+model:
+  name_or_path: Qwen/Qwen3-VL-4B-Instruct
+  adapter_path: outputs/grpo_qlora_48g_domain_v1/final_adapter
+  expected_adapter_sha256: d47c083114e26000c1df5bd52676a1ca9dc2ca708a70c7944c97b3824404486b
+  dtype: bfloat16
+  min_pixels: 200704
+  max_pixels: 802816
+  gradient_checkpointing: true
+  quantization:
+    mode: 4bit
+    quant_type: nf4
+    compute_dtype: bfloat16
+    double_quant: true
+
+data:
+  prompts:
+    path: data/generated/econochart_v2/opd_v1/round1_prompts_3000.jsonl
+    expected_rows: 3000
+    expected_split: train
+  rollouts:
+    path: outputs/opd/round1/student_rollouts/rollouts.jsonl
+    manifest: outputs/opd/round1/student_rollouts/rollout_manifest.json
+    expected_rows: 3600
+  teacher_scores:
+    manifest: outputs/opd/round1/teacher_scores/teacher_score_manifest.json
+    expected_rows: 3600
+
+prerequisites:
+  student_model_audit:
+    path: outputs/opd/model_audits/qwen3vl4b_snapshot.json
+    expected_gate: OPD_MODEL_SNAPSHOT_AUDIT_PASS
+  teacher_qualification:
+    path: outputs/opd/teacher_qualification_v1/paired_gate.json
+    expected_gate: OPD_TEACHER_QUALIFICATION_PASS
+  model_compatibility:
+    path: outputs/opd/model_audits/qwen3vl4b_to_qwen3vl32b_compatibility.json
+    expected_gate: OPD_MODEL_INTERFACE_COMPATIBILITY_PASS
+  teacher_scores:
+    path: outputs/opd/round1/teacher_scores/teacher_score_manifest.json
+    expected_gate: OPD_TEACHER_SCORE_ARTIFACT_PASS
+
+distillation:
+  objective: sparse_forward_kl_with_residual_tail
+  temperature: 1.0
+  top_k: 16
+  minimum_mean_topk_mass: 0.60
+  require_exact_prompt_tokens: true
+  require_image_tokens: true
+
+training:
+  output_dir: outputs/opd/round1/student_update
+  num_train_epochs: 1
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 0.00001
+  weight_decay: 0.0
+  warmup_ratio: 0.05
+  lr_scheduler_type: cosine
+  max_grad_norm: 1.0
+  optim: paged_adamw_8bit
+  bf16: true
+  tf32: true
+  disable_dropout: true
+  logging_steps: 10
+  save_steps: 100
+  expected_micro_steps: 3600
+  expected_optimizer_steps: 450
+  final_adapter_dir: final_adapter
+  result_file: train_results.json
+
+post_training:
+  automatic_round_2: false
+  next_gate: evaluate_round1_on_opd_development_256
