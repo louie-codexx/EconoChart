@@ -4,7 +4,7 @@
 
 EconoChart 不把“跑一次 LoRA”当作项目结论，而是建立一条可审计的实验链：无泄漏数据 → base 基线 → LoRA/QLoRA SFT → 分能力评测与消融 → 可验证 GRPO → 失败复盘。目标能力包括图表理解、数值推理、经营风险诊断和证据约束的决策建议。
 
-> 当前状态（2026-09-02）：已审计的交付模型仍固定为 `Qwen3-VL-4B-Instruct` 加载 `outputs/grpo_qlora_48g_domain_v1/final_adapter`，主线为 `Base → Domain SFT → GRPO R1`。项目已在不改写历史结果的前提下重开一个候选 OPD 阶段；当前仅完成多模态数据隔离、教师资格门、双机工件契约、断点审计和 CPU 回归，尚未产生 OPD adapter 或能力结论。GRPO 完成 3,600 step、14,400 次 rollout 后，在固定 2,496 条内部测试上保持 `0.806343` 的强 SFT 水平；相对 SFT 的成对变化为 `-0.000157`、95% CI `[-0.002294, 0.002112]`，未建立统计可确认的退化。Base→最终 GRPO 的累计 overall 提升为 `+0.456563`，其中包含 SFT 与 GRPO 两阶段贡献。固定 4,446 条 ChartQA/ChartQAPro 外评结论为 `NO_EXTERNAL_GAIN`。并行 mixed-SFT 的 ChartQA exact 提升 `+0.062000`，但未通过 ChartQAPro relaxed 非劣门，故结论为 `EXTERNAL_GUARDRAIL_FAILED`、不晋升。MME-Finance 1,171 条 Base→mixed-SFT 配对流水线和最终审计均通过：surrogate exact/ANLS/token-F1 与效率改善，但 numeric recall 从 `0.699934` 降至 `0.282634`；这些是后续优化诊断，不是官方 MME-Finance 分数，也没有评测最终 GRPO adapter。
+> 当前状态（2026-09-03）：已审计的交付模型仍固定为 `Qwen3-VL-4B-Instruct` 加载 `outputs/grpo_qlora_48g_domain_v1/final_adapter`，主线为 `Base → Domain SFT → GRPO R1`。候选 OPD 的真实双机数据/模型/接口门和 256 条 student/teacher v1 推理已完成；32B teacher v1 的 overall/numeric recall 为 `0.391326/0.277669`，显著低于 4B student 的 `0.835343/0.628906`，因此 v1 资格失败且没有启动 rollout 或训练。当前仅允许在 training-only 28 条任务均衡 smoke 上验证 teacher prompt v2；smoke 通过前程序会拒绝第二次 256 条资格推理。GRPO 完成 3,600 step、14,400 次 rollout 后，在固定 2,496 条内部测试上保持 `0.806343` 的强 SFT 水平；相对 SFT 的成对变化为 `-0.000157`、95% CI `[-0.002294, 0.002112]`，未建立统计可确认的退化。Base→最终 GRPO 的累计 overall 提升为 `+0.456563`，其中包含 SFT 与 GRPO 两阶段贡献。固定 4,446 条 ChartQA/ChartQAPro 外评结论为 `NO_EXTERNAL_GAIN`。并行 mixed-SFT 的 ChartQA exact 提升 `+0.062000`，但未通过 ChartQAPro relaxed 非劣门，故结论为 `EXTERNAL_GUARDRAIL_FAILED`、不晋升。MME-Finance 1,171 条 Base→mixed-SFT 配对流水线和最终审计均通过：surrogate exact/ANLS/token-F1 与效率改善，但 numeric recall 从 `0.699934` 降至 `0.282634`；这些是后续优化诊断，不是官方 MME-Finance 分数，也没有评测最终 GRPO adapter。
 
 ## 最终交付模型
 
@@ -16,17 +16,17 @@ EconoChart 不把“跑一次 LoRA”当作项目结论，而是建立一条可�
 | adapter SHA-256 | `d47c083114e26000c1df5bd52676a1ca9dc2ca708a70c7944c97b3824404486b` |
 | 训练链 | 9,600-row domain QLoRA SFT → 3,600-step GRPO、14,400 rollouts |
 | 内部 overall | `0.806343` |
-| 项目状态 | GRPO R1 为当前 incumbent；OPD 候选处于 code-ready/审计阶段 |
+| 项目状态 | GRPO R1 为当前 incumbent；OPD teacher v1 资格失败，prompt v2 仅获准做 training-only smoke |
 
 该 adapter 不是独立权重，部署时必须同时加载同一基座。选择 GRPO R1 作为项目交付终点，只表示完整、可重载的 SFT→RL 工件已经完成；能力归因仍严格服从 SFT→GRPO 配对置信区间。
 
-完整审计证据：[GRPO 内部摘要](experiments/results/20260828_grpo_internal_summary.json)、[公开外评摘要](experiments/results/20260830_external_generalization_summary.json)、[Mixed-SFT 摘要](experiments/results/20260831_s5_public_mix_result_summary.json)、[MME-Finance 摘要](experiments/results/20260901_mmefinance_pair_summary.json)、[最终选择摘要](experiments/results/20260901_final_model_decision.json) 与 [最终模型卡](docs/final_model_card.md)。
+完整审计证据：[GRPO 内部摘要](experiments/results/20260828_grpo_internal_summary.json)、[公开外评摘要](experiments/results/20260830_external_generalization_summary.json)、[Mixed-SFT 摘要](experiments/results/20260831_s5_public_mix_result_summary.json)、[MME-Finance 摘要](experiments/results/20260901_mmefinance_pair_summary.json)、[最终选择摘要](experiments/results/20260901_final_model_decision.json)、[OPD teacher v1 失败摘要](experiments/results/20260903_opd_teacher_qualification_v1_summary.json) 与 [最终模型卡](docs/final_model_card.md)。
 
 ## 当前候选研究：多模态 OPD
 
 OPD 从冻结的 GRPO R1 学生出发，由 4B 学生先对未见过的 train prompt 生成图像感知 rollout，再由同系列 Qwen3-VL-32B 教师对**学生实际访问的相同前缀**给出 top-k token 概率，最后只更新学生 LoRA。固定答案只用于审计，不进入蒸馏目标，因此该阶段不是“教师生成答案后再做一次 SFT”。
 
-当前状态是 `code_ready`，不是 `completed`：3,000 条 round-1 prompt、600 条额外 hard rollout、256/256 教师资格与开发面板、内容级图片防泄漏、教师资格阈值和 round 晋级阈值都已在运行前冻结；GPU 前仍需完成真实数据构建、32B/4B 模型快照和 tokenizer/视觉接口审计。双机顺序、每一步的 GPU 开关和工件传输见 [双机多模态 OPD 手册](docs/opd_runbook.md)。
+当前状态是 `teacher_v1_failed`，不是 `completed`：真实数据构建、32B/4B 模型快照、tokenizer/视觉接口审计和 v1 双机资格推理均已完成，但 32B teacher 没有通过相对能力门。四类严格章节标签均为 `0/256`，且 numeric recall、trend、risk 也同时退化，所以不能把失败归咎于单一 format metric。仓库现已冻结不读标签的 `opd_teacher_protocol_v2`、七类任务各 4 条的 training-only smoke 和不变的 v2 正式资格门；smoke PASS 只授权一次 v2 资格复跑，不授权 3,000 条 rollout。双机顺序、每一步的 GPU 开关和工件传输见 [双机多模态 OPD 手册](docs/opd_runbook.md)。
 
 ## 为什么这个项目不是普通微调 Demo
 

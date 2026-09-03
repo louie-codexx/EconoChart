@@ -88,6 +88,8 @@
 
 最终选择不会追溯改写历史实验决策。mixed-SFT、F2 numeric reward、300-step recall-repair GRPO 和 projector 解冻均是优化建议；除 mixed-SFT 本身外，后续方案没有运行，不能写成实验结果。
 
-## 2026-09-02 OPD 候选阶段
+## 2026-09-03 OPD 候选阶段
 
-项目现已重开多模态 on-policy distillation 候选研究。历史 `F0` 的聚合结果和 GRPO adapter 身份保持不变；新阶段单列为 `O1`，状态只能从 `code_ready` 经真实数据/模型门、教师资格和 GPU 工件审计逐步迁移。教师下载完成、配置写好或 CPU 测试通过都不等于训练完成，更不等于能力提升。完整冻结设计见 `docs/opd_runbook.md`。
+项目已重开多模态 on-policy distillation 候选研究。历史 `F0` 的聚合结果和 GRPO adapter 身份保持不变；新阶段单列为 `O1`。真实数据/模型/接口门以及 student/teacher v1 的 256 条资格推理均已完成，但 teacher v1 的 overall/numeric recall `0.391326/0.277669` 低于 student 的 `0.835343/0.628906`，资格失败。当前没有 OPD rollout、teacher score、更新后 adapter 或能力提升结论。
+
+v1 失败不会被删除或改门：其严格章节标签命中为 `0/256`，同时 numeric recall、trend、risk 也退化。下一步只允许在未见 train prompt 上运行七类任务各 4 条的 prompt-v2 smoke；只有冻结绝对门 PASS 才可对原 256 条做唯一一次 v2 资格复跑，且正式相对阈值与 v1 完全相同。摘要见 `experiments/results/20260903_opd_teacher_qualification_v1_summary.json`，完整执行边界见 `docs/opd_runbook.md`。

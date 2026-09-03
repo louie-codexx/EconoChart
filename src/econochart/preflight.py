@@ -315,13 +315,23 @@ def _data_checks(report: Report, stage: str, config: dict[str, Any]) -> None:
                 }
             )
             max_samples = source.get("max_samples")
-            effective_rows = (
-                len(rows)
-                if max_samples is None or int(max_samples) < 0
-                else min(len(rows), int(max_samples))
-            )
+            task_quotas = source.get("task_quotas")
+            if task_quotas is not None:
+                effective_rows = sum(int(value) for value in task_quotas.values())
+            else:
+                effective_rows = (
+                    len(rows)
+                    if max_samples is None or int(max_samples) < 0
+                    else min(len(rows), int(max_samples))
+                )
             expected_rows = source.get("expected_rows")
-            source_summary.update({"effective_rows": effective_rows, "expected_rows": expected_rows})
+            source_summary.update(
+                {
+                    "effective_rows": effective_rows,
+                    "expected_rows": expected_rows,
+                    "task_quotas": task_quotas,
+                }
+            )
             group_rows += effective_rows
             if expected_rows is not None and effective_rows != int(expected_rows):
                 report.issue(

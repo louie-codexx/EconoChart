@@ -1,0 +1,15 @@
+extends: configs/eval/opd_teacher_qualification.yaml
+
+experiment:
+  id: opd_teacher_qualification_qwen3vl32b_v2
+  checkpoint_stage: qwen3vl32b_teacher_prompt_v2
+  role: opd_teacher_qualification_candidate
+  prompt_protocol: opd_teacher_protocol_v2
+  prerequisite_gate: outputs/opd/teacher_prompt_smoke_v2/gate.json
+  prerequisite_gate_name: OPD_TEACHER_PROMPT_SMOKE_PASS
+
+generation:
+  prompt_profile: opd_teacher_protocol_v2
+
+training:
+  output_dir: outputs/opd/teacher_qualification_v2/teacher_qwen3vl32b

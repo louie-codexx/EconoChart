@@ -1,0 +1,71 @@
+{
+  "experiment": "opd_teacher_qualification_v1",
+  "evidence_date": "2026-09-03",
+  "status": "failed",
+  "scope": "frozen_256_row_validation_qualification_panel",
+  "remote_artifacts": {
+    "student_predictions": "outputs/opd/teacher_qualification_v1/student_grpo4b/predictions.jsonl",
+    "teacher_predictions": "outputs/opd/teacher_qualification_v1/teacher_qwen3vl32b/predictions.jsonl",
+    "raw_predictions_committed_to_git": false
+  },
+  "runtime": {
+    "student_exit_code": 0,
+    "teacher_exit_code": 0,
+    "inference_pipeline_completed": true
+  },
+  "student_grpo4b": {
+    "overall": 0.835343,
+    "numeric": 0.652896,
+    "numeric_recall": 0.628906,
+    "numeric_precision": 0.72589,
+    "trend": 0.971154,
+    "format": 1.0,
+    "risk": 0.747748,
+    "mean_latency_seconds": 4.639846,
+    "mean_completion_tokens": 67.758
+  },
+  "teacher_qwen3vl32b_v1": {
+    "overall": 0.391326,
+    "numeric": 0.287184,
+    "numeric_recall": 0.277669,
+    "numeric_precision": 0.688778,
+    "trend": 0.592949,
+    "format": 0.0,
+    "risk": 0.121622,
+    "length": 0.925798,
+    "mean_latency_seconds": 12.500387,
+    "mean_completion_tokens": 219.109
+  },
+  "required_point_estimate_deltas": {
+    "overall": -0.444017,
+    "numeric_recall": -0.351237
+  },
+  "teacher_task_slices": {
+    "comprehensive_report": {"rows": 8, "overall": 0.2422, "numeric_recall": 0.0, "format": 0.0},
+    "decision_support": {"rows": 58, "overall": 0.3005, "numeric_recall": 0.1839, "format": 0.0},
+    "numerical_reasoning": {"rows": 46, "overall": 0.3856, "numeric_recall": 0.2899, "format": 0.0},
+    "relationship_analysis": {"rows": 45, "overall": 0.3047, "numeric_recall": 0.037, "format": 0.0},
+    "risk_diagnosis": {"rows": 30, "overall": 0.419, "numeric_recall": 0.3889, "format": 0.0},
+    "trend_analysis": {"rows": 7, "overall": 0.4814, "numeric_recall": 0.25, "format": 0.0},
+    "value_retrieval": {"rows": 62, "overall": 0.5319, "numeric_recall": 0.5161, "format": 0.0}
+  },
+  "diagnosis": {
+    "strict_section_tag_counts": {
+      "结论": "0/256",
+      "数据依据": "0/256",
+      "风险": "0/256",
+      "建议": "0/256"
+    },
+    "verified_drivers": [
+      "Teacher v1 used Markdown headings instead of the exact auditable section tags.",
+      "Complex-task answers often enumerated raw yearly values instead of prioritizing the requested derived targets.",
+      "Numeric recall, trend and risk degraded in addition to format, so relaxing the format metric cannot qualify v1."
+    ]
+  },
+  "decision": {
+    "v1_artifacts_are_immutable": true,
+    "opd_rollout_authorized": false,
+    "next_step": "training_only_task_balanced_prompt_v2_smoke",
+    "formal_v2_thresholds_unchanged_from_v1": true
+  }
+}

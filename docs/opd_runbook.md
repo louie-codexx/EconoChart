@@ -10,6 +10,7 @@ distillation，而不是把教师完整回答当作新的 SFT 固定答案。
 |---|---|---|---|
 | 代码、数据与模型文件下载 | 开无卡模式 | 关机 | 否 |
 | 模型分片、tokenizer、processor 审计 | 开无卡模式 | 关机 | 否 |
+| 教师提示协议 smoke（28 条 train） | 开 GPU | 关机 | 是，仅 96GB，约一次短跑 |
 | 教师资格推理 | 开 GPU | 关机 | 是，仅 96GB |
 | 学生资格基线与 round-1 rollout | 关机 | 开 GPU | 是，仅 48GB |
 | 教师 top-k score | 开 GPU | 关机 | 是，仅 96GB |
@@ -25,18 +26,77 @@ distillation，而不是把教师完整回答当作新的 SFT 固定答案。
 - internal final test、ChartQA、ChartQAPro、MME-Finance 不参与教师选择、prompt 筛选、训练或 round 晋级。
 - round 1 更新后必须重新生成 rollout 才能称为 round 2；旧 score 不可重复使用。
 
+## 教师资格 v1 的真实失败与不可变边界
+
+2026-09-03 的双机实跑已证明推理链路可用：GRPO-4B student 与
+Qwen3-VL-32B teacher 都在冻结的 256 条 qualification panel 上自然结束，exit code
+均为 0。但 student overall/numeric recall 为 `0.835343/0.628906`，teacher v1 仅为
+`0.391326/0.277669`，所以 v1 按预注册资格门失败，不能启动 3,000 条 rollout。
+
+CPU 诊断进一步确认 teacher v1 的四类严格章节标签命中均为 `0/256`。它使用了
+Markdown 标题而非 `【结论】` 等机器协议；同时复杂任务经常枚举原始年度值，却没有
+优先计算题目点名的累计变化、增速差、利润率百分点变化或 ARPU。因此 v1 不是单纯
+评分器误伤，不能通过放宽 format 或移动资格阈值修复。v1 预测、metrics 和日志必须保留，
+v2 使用独立目录；可提交摘要见
+`experiments/results/20260903_opd_teacher_qualification_v1_summary.json`。
+
 ## 执行顺序
 
-1. 无卡：两台主机对齐同一 Git commit，构建并审计 OPD 数据；教师模型下载完成后运行模型快照审计和 4B/32B 接口兼容性检查。
-2. 48GB GPU：在 `teacher_qualification_256.jsonl` 上评测冻结的 GRPO-4B 学生。
-3. 96GB GPU：在完全相同的 256 条上评测 32B 教师；关闭 GPU。
-4. 无卡：运行教师 paired qualification。只有 `OPD_TEACHER_QUALIFICATION_PASS` 才允许继续。
-5. 48GB GPU：从冻结 GRPO adapter 对 round-1 prompt 生成 3,600 条图像感知 rollout；保存真实 prompt/completion token IDs、图片哈希与生成种子，然后关闭 GPU。
-6. 把完整 `outputs/opd/round1/student_rollouts/` 目录传到教师机；96GB GPU 对相同学生前缀生成 top-16 teacher log-prob 分片。每个 shard 都有 SHA256 与 top-k mass 统计；完成后关闭 GPU。
-7. 把完整 `outputs/opd/round1/teacher_scores/` 目录传回学生机。学生端允许 manifest 中保留教师机绝对路径，但只会在原路径缺失时回退到 manifest 同目录的同名 shard，并始终重验 SHA256。
-8. 48GB GPU：从原 GRPO adapter 做一轮稀疏 forward-KL 更新，3,600 micro-steps、梯度累积 8、450 optimizer steps，保存可恢复 checkpoint 和 final adapter。
-9. 48GB GPU：在冻结的 `opd_development_256.jsonl` 上分别评测原 GRPO 基线和 round-1 候选；完成后关闭 GPU。
-10. 无卡：运行 paired development gate。通过仅表示 round-1 可晋升为最终候选并允许人工评估 round-2 成本；代码不会自动启动 round 2。失败则保留原 GRPO R1 为最终模型。
+1. 无卡：两台主机对齐同一 Git commit，构建并审计 OPD 数据；教师模型下载完成后运行模型快照审计和 4B/32B 接口兼容性检查。（已完成）
+2. 48GB GPU：在 `teacher_qualification_256.jsonl` 上评测冻结的 GRPO-4B student v1。（已完成，保留）
+3. 96GB GPU：在完全相同的 256 条上评测 32B teacher v1。（已完成但资格失败，保留）
+4. 96GB GPU：使用 `opd_teacher_protocol_v2`，只在 round-1 train prompt 的七类任务各 4 条上运行 28 条 smoke；不接触 qualification/development/test。
+5. 无卡：运行 `OPD_TEACHER_PROMPT_SMOKE` 绝对门。只有 PASS 才允许唯一一次 v2 256 条资格复跑；失败只能继续使用 train smoke 修订提示词。
+6. 96GB GPU：在原冻结 256 条上运行 teacher v2；runner 会在加载模型前硬校验 smoke PASS。完成后关闭 GPU。
+7. 无卡：运行 v2 paired qualification；其阈值与 v1 完全相同，且会复核 smoke gate 与 candidate run manifest 中的 prompt profile。只有 `OPD_TEACHER_QUALIFICATION_PASS` 才允许继续。
+8. 48GB GPU：从冻结 GRPO adapter 对 round-1 prompt 生成 3,600 条图像感知 rollout；保存真实 prompt/completion token IDs、图片哈希与生成种子，然后关闭 GPU。
+9. 把完整 `outputs/opd/round1/student_rollouts/` 目录传到教师机；96GB GPU 对相同学生前缀生成 top-16 teacher log-prob 分片。每个 shard 都有 SHA256 与 top-k mass 统计；完成后关闭 GPU。
+10. 把完整 `outputs/opd/round1/teacher_scores/` 目录传回学生机。学生端允许 manifest 中保留教师机绝对路径，但只会在原路径缺失时回退到 manifest 同目录的同名 shard，并始终重验 SHA256。
+11. 48GB GPU：从原 GRPO adapter 做一轮稀疏 forward-KL 更新，3,600 micro-steps、梯度累积 8、450 optimizer steps，保存可恢复 checkpoint 和 final adapter。
+12. 48GB GPU：在冻结的 `opd_development_256.jsonl` 上分别评测原 GRPO 基线和 round-1 候选；完成后关闭 GPU。
+13. 无卡：运行 paired development gate。通过仅表示 round-1 可晋升为最终候选并允许人工评估 round-2 成本；代码不会自动启动 round 2。失败则保留原 GRPO R1 为最终模型。
+
+## teacher prompt v2 的低成本恢复路线
+
+先保持 96GB 实例为无卡模式，拉取最新代码并只审计 28 条 train smoke 的输入身份：
+
+```bash
+cd /root/autodl-tmp/EconoChart
+git pull --ff-only origin main
+export PYTHONPATH="$PWD/src"
+export OMP_NUM_THREADS=8
+TEACHER_PY=/root/autodl-tmp/envs/econochart-teacher-cu130/bin/python
+
+"$TEACHER_PY" -m econochart.preflight \
+  --stage eval \
+  --config configs/eval/opd_teacher_prompt_smoke_v2.yaml \
+  --model /root/autodl-tmp/models/Qwen3-VL-32B-Instruct \
+  --inputs-only \
+  --report outputs/opd/teacher_prompt_smoke_v2/preflight_inputs.json
+```
+
+该报告 PASS 后才打开 96GB GPU，并把 28 条 smoke 放进独立 tmux：
+
+```bash
+mkdir -p /root/autodl-tmp/EconoChart/outputs/opd/logs
+tmux new-session -d -s opd_teacher_prompt_smoke_v2 \
+  "bash -lc 'cd /root/autodl-tmp/EconoChart && export PYTHONPATH=/root/autodl-tmp/EconoChart/src && export OMP_NUM_THREADS=8 && /root/autodl-tmp/envs/econochart-teacher-cu130/bin/python -m econochart.evaluation.runner --config configs/eval/opd_teacher_prompt_smoke_v2.yaml --model /root/autodl-tmp/models/Qwen3-VL-32B-Instruct >> outputs/opd/logs/teacher_prompt_smoke_v2.log 2>&1; code=\$?; echo TEACHER_PROMPT_SMOKE_EXIT_CODE=\$code >> outputs/opd/logs/teacher_prompt_smoke_v2.log; exit \$code'"
+```
+
+tmux 结束后立刻切回无卡模式，再运行冻结 smoke gate：
+
+```bash
+cd /root/autodl-tmp/EconoChart
+export PYTHONPATH="$PWD/src"
+/root/autodl-tmp/envs/econochart-teacher-cu130/bin/python \
+  -m econochart.distillation.prompt_smoke \
+  --config configs/opd/teacher_prompt_smoke_v2.yaml
+```
+
+任何非零退出都必须保留预测、日志和失败报告，不得用 `--force` 覆盖，也不得改用
+qualification 数据调 prompt；需要修订时创建新的协议版本和独立输出目录。
+只有日志出现 `TEACHER_PROMPT_SMOKE_EXIT_CODE=0` 且 gate 为
+`OPD_TEACHER_PROMPT_SMOKE_PASS`，才进入 `configs/eval/opd_teacher_qualification_v2.yaml`。
 
 ## 下载完成后的第一个无卡门
 

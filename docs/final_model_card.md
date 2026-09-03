@@ -71,7 +71,7 @@ Mixed-SFT 从同一 Base 独立训练，加入 3,200 条 ChartQA 后，ChartQA e
 
 如果错误进一步定位为 OCR、刻度或密集标签读取，再单独解冻 projector；只有 projector 仍不足时才考虑视觉塔。开放式建议与证据质量最终仍需要官方图像感知 judge 或人工偏好评测。
 
-项目于 2026-09-02 重开独立的多模态 OPD 候选研究。该研究从本 adapter 出发，但在教师资格、学生 rollout、教师前缀评分、KL 更新和冻结开发门全部完成前，不会替换本卡中的 incumbent，也不会把 `code_ready` 写成已提升。执行边界见 [OPD 手册](opd_runbook.md)。
+项目于 2026-09-02 重开独立的多模态 OPD 候选研究。2026-09-03 的真实资格推理中，32B teacher v1 明确低于本 adapter 驱动的 4B student，故 v1 失败且没有启动 rollout；当前只允许用 training-only smoke 验证 prompt v2。除非 v2 通过不变的 256 条资格门，并继续完成学生 rollout、教师前缀评分、KL 更新和冻结开发门，否则不会替换本卡中的 incumbent。执行边界见 [OPD 手册](opd_runbook.md)。
 
 ## 使用范围与限制
 

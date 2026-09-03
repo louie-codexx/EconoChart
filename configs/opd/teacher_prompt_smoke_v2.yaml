@@ -1,0 +1,54 @@
+experiment:
+  id: opd_teacher_prompt_smoke_qwen3vl32b_v2
+  purpose: validate_prompt_protocol_on_training_only_records_before_one_v2_qualification
+
+inputs:
+  predictions: outputs/opd/teacher_prompt_smoke_v2/qwen3vl32b/predictions.jsonl
+  expected_rows: 28
+  expected_task_counts:
+    comprehensive_report: 4
+    decision_support: 4
+    numerical_reasoning: 4
+    relationship_analysis: 4
+    risk_diagnosis: 4
+    trend_analysis: 4
+    value_retrieval: 4
+
+output: outputs/opd/teacher_prompt_smoke_v2/gate.json
+
+reward_weights:
+  numeric: 0.35
+  trend: 0.20
+  format: 0.15
+  evidence: 0.15
+  risk: 0.10
+  length: 0.05
+
+gates:
+  # Frozen before the first v2 generation. These are absolute smoke checks,
+  # not a substitute for the paired 256-row teacher qualification.
+  minimum_overall:
+    overall: 0.62
+    numeric_recall: 0.55
+    numeric_precision: 0.65
+    trend: 0.70
+    format: 1.0
+    evidence: 0.75
+    risk: 0.50
+  minimum_task_metrics:
+    comprehensive_report: {overall: 0.50}
+    decision_support: {overall: 0.50}
+    numerical_reasoning: {overall: 0.55}
+    relationship_analysis: {overall: 0.50}
+    risk_diagnosis: {overall: 0.55}
+    trend_analysis: {overall: 0.60}
+    value_retrieval: {overall: 0.65}
+  maximum_efficiency:
+    mean_completion_tokens: 190
+  maximum_protocol_failures: 0
+
+decision:
+  pass_action: permit_exactly_one_v2_run_on_the_frozen_256_row_qualification_panel
+  fail_action: stop_before_qualification_and_create_a_new_versioned_prompt_smoke_on_training_records
+  qualification_thresholds_remain_frozen_from_v1: true
+  no_opd_rollout_is_authorized_by_this_smoke_gate: true

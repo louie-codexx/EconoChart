@@ -16,11 +16,16 @@ def _device(model: Any) -> Any:
         return next(model.parameters()).device
 
 
-def _build_messages(record: dict[str, Any], image: Image.Image) -> list[dict[str, Any]]:
+def _build_messages(
+    record: dict[str, Any],
+    image: Image.Image,
+    *,
+    prompt_profile: str | None = None,
+) -> list[dict[str, Any]]:
     return [
         {
             "role": "system",
-            "content": [{"type": "text", "text": system_prompt_for(record)}],
+            "content": [{"type": "text", "text": system_prompt_for(record, prompt_profile)}],
         },
         {
             "role": "user",
@@ -45,7 +50,9 @@ def generate_one(
         raise FileNotFoundError(f"Image missing for {record['id']}: {image_path}")
     with Image.open(image_path) as source:
         image = source.convert("RGB")
-    messages = _build_messages(record, image)
+    prompt_profile_value = generation_config.get("prompt_profile")
+    prompt_profile = str(prompt_profile_value) if prompt_profile_value is not None else None
+    messages = _build_messages(record, image, prompt_profile=prompt_profile)
     inputs = processor.apply_chat_template(
         messages,
         tokenize=True,

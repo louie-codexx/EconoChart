@@ -7,7 +7,7 @@ from typing import Any
 
 from econochart.config import load_config, project_path, require
 from econochart.evaluation.compare import compare_rows
-from econochart.io import read_jsonl, sha256_file, write_json
+from econochart.io import read_json, read_jsonl, sha256_file, write_json
 
 
 def _load_predictions(
@@ -40,6 +40,41 @@ def _metric_summary(comparison: dict[str, Any], metric: str) -> dict[str, Any]:
     if not isinstance(summary, dict) or not summary.get("rows"):
         raise ValueError(f"Qualification metric {metric!r} is unavailable in paired predictions")
     return summary
+
+
+def _validate_teacher_candidate_contract(config: dict[str, Any]) -> None:
+    inputs = config.get("inputs", {})
+    gate_value = inputs.get("prerequisite_gate")
+    if gate_value is not None:
+        gate_path = project_path(str(gate_value))
+        if not gate_path.is_file():
+            raise FileNotFoundError(f"Teacher qualification prerequisite gate does not exist: {gate_path}")
+        gate_report = read_json(gate_path)
+        expected_gate = str(inputs.get("prerequisite_gate_name", "")).strip()
+        if not expected_gate:
+            raise ValueError("inputs.prerequisite_gate_name is required with prerequisite_gate")
+        if gate_report.get("status") != "passed" or gate_report.get("gate") != expected_gate:
+            raise ValueError(
+                f"Teacher qualification prerequisite gate is not satisfied: expected {expected_gate}, "
+                f"observed status={gate_report.get('status')!r}, gate={gate_report.get('gate')!r}"
+            )
+
+    manifest_value = inputs.get("candidate_manifest")
+    required_profile = inputs.get("required_prompt_profile")
+    if manifest_value is None and required_profile is None:
+        return
+    if manifest_value is None or required_profile is None:
+        raise ValueError("candidate_manifest and required_prompt_profile must be configured together")
+    manifest_path = project_path(str(manifest_value))
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"Teacher candidate run manifest does not exist: {manifest_path}")
+    manifest = read_json(manifest_path)
+    observed_profile = manifest.get("config", {}).get("generation", {}).get("prompt_profile")
+    if observed_profile != required_profile:
+        raise ValueError(
+            "Teacher candidate run manifest has the wrong prompt profile: "
+            f"expected {required_profile!r}, observed {observed_profile!r}"
+        )
 
 
 def evaluate_qualification_gates(comparison: dict[str, Any], gates: dict[str, Any]) -> dict[str, Any]:
@@ -181,6 +216,7 @@ def run_paired_gate(
 
 
 def qualify_teacher(config: dict[str, Any], *, force: bool = False) -> dict[str, Any]:
+    _validate_teacher_candidate_contract(config)
     return run_paired_gate(
         config,
         pass_gate="OPD_TEACHER_QUALIFICATION_PASS",

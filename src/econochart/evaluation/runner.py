@@ -18,12 +18,31 @@ from econochart.models.loading import load_adapter, load_base_model, load_proces
 from econochart.training.common import resolve_output_dir, save_run_snapshot, seed_everything
 
 
+def _validate_prerequisite_gate(config: dict[str, Any]) -> None:
+    experiment = config.get("experiment", {})
+    gate_value = experiment.get("prerequisite_gate")
+    if gate_value is None:
+        return
+    gate_path = project_path(str(gate_value))
+    if not gate_path.is_file():
+        raise FileNotFoundError(f"Evaluation prerequisite gate does not exist: {gate_path}")
+    report = read_json(gate_path)
+    expected_gate = str(experiment.get("prerequisite_gate_name", "")).strip()
+    if not expected_gate:
+        raise ValueError("experiment.prerequisite_gate_name is required with prerequisite_gate")
+    if report.get("status") != "passed" or report.get("gate") != expected_gate:
+        raise ValueError(
+            f"Evaluation prerequisite gate is not satisfied: expected {expected_gate}, "
+            f"observed status={report.get('status')!r}, gate={report.get('gate')!r}"
+        )
+
+
 def _load_eval_records(config: dict[str, Any]) -> list[dict[str, Any]]:
     seed = int(config.get("seed", 20260821))
     sources = config.get("data", {}).get("test", [])
     expected_split = str(config.get("evaluation", {}).get("expected_split", "test"))
-    if expected_split not in {"val", "test"}:
-        raise ValueError(f"evaluation.expected_split must be val or test, got {expected_split!r}")
+    if expected_split not in {"train", "val", "test"}:
+        raise ValueError(f"evaluation.expected_split must be train, val or test, got {expected_split!r}")
     records = load_record_sources(sources, expected_split=expected_split, seed=seed) if sources else []
     if not records:
         raise ValueError("No evaluation records configured under data.test")
@@ -100,6 +119,7 @@ def run(
     output_override: str | None,
     resume: bool = False,
 ) -> dict[str, Any]:
+    _validate_prerequisite_gate(config)
     records = _load_eval_records(config)
     model_path = resolve_model_path(config, model_override)
     adapter_path = resolve_adapter_path(config, adapter_override)

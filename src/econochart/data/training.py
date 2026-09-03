@@ -27,6 +27,68 @@ GRPO_SYSTEM_PROMPT = (
     "不得编造图中不存在的数值。"
 )
 
+OPD_TEACHER_PROMPT_PROFILE_V2 = "opd_teacher_protocol_v2"
+
+_OPD_TEACHER_TASK_SECTIONS = {
+    "value_retrieval": ("结论", "数据依据"),
+    "numerical_reasoning": ("结论", "数据依据"),
+    "relationship_analysis": ("结论", "数据依据"),
+    "trend_analysis": ("结论", "数据依据", "风险"),
+    "risk_diagnosis": ("结论", "数据依据", "风险"),
+    "decision_support": ("结论", "数据依据", "风险", "建议"),
+    "comprehensive_report": ("结论", "数据依据", "风险", "建议"),
+}
+
+_OPD_TEACHER_TASK_FOCUS = {
+    "value_retrieval": "直接给出被问对象、数值和单位，不扩写未被问的年份或指标。",
+    "numerical_reasoning": "写出必要的计算关系和最终结果，明确保留正负号、百分比或百分点单位。",
+    "relationship_analysis": "只比较题目点名的指标，明确累计变化、差值、ARPU或利润率变化等目标量。",
+    "trend_analysis": "明确判断增强、减弱、分化、上升、下降或稳定，并用累计变化和最新变化支撑。",
+    "risk_diagnosis": "只选最重要的两项风险，每项给出题内指标、变化方向和一个量化依据。",
+    "decision_support": "建议必须逐项对应已识别风险，并用最少的关键数值解释优先级。",
+    "comprehensive_report": "覆盖题目要求的经营结论、关键派生指标、主要风险和可执行建议，避免逐年抄表。",
+}
+
+
+def opd_teacher_required_sections(task_type: str, *, view_type: str | None = None) -> tuple[str, ...]:
+    try:
+        sections = _OPD_TEACHER_TASK_SECTIONS[task_type]
+    except KeyError as error:
+        raise ValueError(f"Unsupported OPD teacher task type: {task_type!r}") from error
+    if task_type == "relationship_analysis" and view_type == "financial":
+        return (*sections, "风险")
+    return sections
+
+
+def _opd_teacher_system_prompt_v2(record: dict[str, Any]) -> str:
+    if _is_public(record):
+        raise ValueError("OPD teacher protocol v2 is restricted to EconoChart domain records")
+    task_type = str(record.get("task_type", ""))
+    sections = opd_teacher_required_sections(task_type, view_type=str(record.get("view_type", "")))
+    labels = "、".join(f"【{section}】" for section in sections)
+    max_chars = 420 if task_type == "comprehensive_report" else 320 if task_type == "decision_support" else 260
+    risk_guidance = (
+        "【风险】使用收入下降、用户流失、利润率承压、变现能力、获客成本上升、"
+        "产品集中或波动等与题意相符的明确表述。"
+        if "风险" in sections
+        else ""
+    )
+    recommendation_guidance = "【建议】必须与已写风险逐项对应。" if "建议" in sections else ""
+    return (
+        "你是一名严谨的数字经济经营分析师。只依据图表和用户问题作答，不得编造数据或因果。"
+        "这是机器可审计的严格输出协议："
+        f"必须按顺序使用且仅使用以下章节标签，每个标签原样出现一次：{labels}。"
+        "标签必须写成全角方括号形式；不得改成Markdown标题、加粗标题或编号标题；标签前不得有开场白。"
+        "先识别问题要求的最终指标，再读取或计算所需数值；若问题要求百分比变化、增速差、"
+        "利润率变化、CAGR或ARPU，必须明确写出最终值、正负号与单位。"
+        "不要用整段原始年度序列代替被问目标，"
+        "也不要罗列与结论无关的数字。"
+        f"本题任务要求：{_OPD_TEACHER_TASK_FOCUS[task_type]}"
+        "【数据依据】中的每个关键数值都要紧邻指标名称。"
+        f"{risk_guidance}{recommendation_guidance}"
+        f"全文尽量控制在{max_chars}个汉字以内，直接输出答案，不解释协议。"
+    )
+
 
 def _sample_records(
     records: list[dict[str, Any]],
@@ -40,6 +102,32 @@ def _sample_records(
         records,
         key=lambda row: stable_seed(f"{namespace}:{row['id']}", seed),
     )[:max_samples]
+
+
+def _sample_task_quotas(
+    records: list[dict[str, Any]],
+    task_quotas: dict[str, Any],
+    seed: int,
+    namespace: str,
+) -> list[dict[str, Any]]:
+    if not task_quotas:
+        raise ValueError("task_quotas must be a non-empty mapping")
+    selected: list[dict[str, Any]] = []
+    for task_type, raw_quota in sorted(task_quotas.items()):
+        quota = int(raw_quota)
+        if quota < 1:
+            raise ValueError(f"task_quotas[{task_type!r}] must be positive")
+        candidates = [row for row in records if str(row.get("task_type")) == str(task_type)]
+        if len(candidates) < quota:
+            raise ValueError(
+                f"task_quotas[{task_type!r}] requires {quota} rows, found {len(candidates)}"
+            )
+        ranked = sorted(
+            candidates,
+            key=lambda row: stable_seed(f"{namespace}:task:{task_type}:{row['id']}", seed),
+        )
+        selected.extend(ranked[:quota])
+    return selected
 
 
 def _sampling_namespace(source: dict[str, Any], source_index: int) -> str:
@@ -73,12 +161,21 @@ def load_record_sources(
             raise ValueError(
                 f"Source {path} contains {len(wrong_split)} rows outside split={expected_split}; first={wrong_split[0]}"
             )
-        records = _sample_records(
-            records,
-            source.get("max_samples"),
-            seed,
-            namespace=_sampling_namespace(source, source_index),
-        )
+        namespace = _sampling_namespace(source, source_index)
+        task_quotas = source.get("task_quotas")
+        if task_quotas is not None:
+            if source.get("max_samples") is not None:
+                raise ValueError("A source cannot configure both max_samples and task_quotas")
+            if not isinstance(task_quotas, dict):
+                raise ValueError("task_quotas must be a mapping")
+            records = _sample_task_quotas(records, task_quotas, seed, namespace)
+        else:
+            records = _sample_records(
+                records,
+                source.get("max_samples"),
+                seed,
+                namespace=namespace,
+            )
         expected_rows = source.get("expected_rows")
         if expected_rows is not None and len(records) != int(expected_rows):
             raise ValueError(
@@ -106,7 +203,11 @@ def _is_public(record: dict[str, Any]) -> bool:
     return str(record.get("dataset", "")).lower() in {"chartqa", "chartqapro", "mmefinance"}
 
 
-def system_prompt_for(record: dict[str, Any]) -> str:
+def system_prompt_for(record: dict[str, Any], profile: str | None = None) -> str:
+    if profile == OPD_TEACHER_PROMPT_PROFILE_V2:
+        return _opd_teacher_system_prompt_v2(record)
+    if profile is not None:
+        raise ValueError(f"Unsupported system prompt profile: {profile!r}")
     if str(record.get("dataset", "")).lower() == "mmefinance":
         return MMEFINANCE_SYSTEM_PROMPT
     return PUBLIC_QA_SYSTEM_PROMPT if _is_public(record) else DOMAIN_SYSTEM_PROMPT

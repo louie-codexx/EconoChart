@@ -1,0 +1,34 @@
+extends: configs/eval/opd_teacher_qualification.yaml
+
+experiment:
+  id: opd_teacher_prompt_smoke_qwen3vl32b_v2
+  checkpoint_stage: qwen3vl32b_teacher_prompt_candidate
+  role: training_only_prompt_calibration
+  prompt_protocol: opd_teacher_protocol_v2
+
+data:
+  # This is a deterministic, task-balanced sample of round-1 TRAIN prompts.
+  # It must never point at teacher qualification, development, internal test,
+  # ChartQA/ChartQAPro test or MME-Finance records.
+  test:
+    - path: data/generated/econochart_v2/opd_v1/round1_prompts_3000.jsonl
+      sampling_namespace: opd-teacher-prompt-smoke-v2
+      task_quotas:
+        comprehensive_report: 4
+        decision_support: 4
+        numerical_reasoning: 4
+        relationship_analysis: 4
+        risk_diagnosis: 4
+        trend_analysis: 4
+        value_retrieval: 4
+      expected_rows: 28
+
+generation:
+  prompt_profile: opd_teacher_protocol_v2
+
+evaluation:
+  expected_split: train
+  save_every: 7
+
+training:
+  output_dir: outputs/opd/teacher_prompt_smoke_v2/qwen3vl32b

@@ -1,0 +1,23 @@
+extends: configs/opd/teacher_qualification_v1.yaml
+
+experiment:
+  id: opd_teacher_qualification_qwen3vl32b_v2
+  purpose: decide_whether_prompt_aligned_teacher_adds_capability_before_opd
+  prompt_protocol: opd_teacher_protocol_v2
+  thresholds_inherited_from: configs/opd/teacher_qualification_v1.yaml
+  prerequisite_gate: outputs/opd/teacher_prompt_smoke_v2/gate.json
+
+inputs:
+  candidate: outputs/opd/teacher_qualification_v2/teacher_qwen3vl32b/predictions.jsonl
+  candidate_manifest: outputs/opd/teacher_qualification_v2/teacher_qwen3vl32b/run_manifest.json
+  required_prompt_profile: opd_teacher_protocol_v2
+  prerequisite_gate: outputs/opd/teacher_prompt_smoke_v2/gate.json
+  prerequisite_gate_name: OPD_TEACHER_PROMPT_SMOKE_PASS
+
+output: outputs/opd/teacher_qualification_v2/paired_gate.json
+
+decision:
+  pass_action: permit_multimodal_opd_smoke_only
+  fail_action: stop_before_opd_and_reconsider_teacher_or_prompt_alignment
+  thresholds_are_frozen_before_predictions: true
+  v1_failed_artifacts_are_immutable: true
