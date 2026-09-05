@@ -3,6 +3,13 @@ base_model: Qwen/Qwen3-VL-4B-Instruct
 data_version: econochart-v2.0
 comparison_seed: 20260821
 
+project_closeout:
+  decided_on: "2026-09-05"
+  status: closed_at_grpo_no_further_training
+  final_experiment: F0_final_model_selection
+  evidence: experiments/results/20260905_grpo_project_closeout.json
+  additional_gpu_experiments_scheduled: false
+
 rules:
   - Freeze the test IDs and hashes before the base run.
   - Change one primary factor per ablation.
@@ -129,12 +136,12 @@ experiments:
 
   - id: S4_quantization_ablation
     stage: sft_ablation
-    status: conditional
+    status: deferred
     configs:
       - configs/train/sft_qlora_r16_screen.yaml
       - configs/train/sft_lora_4090_ablation.yaml
     single_factor: 4-bit QLoRA versus BF16 LoRA
-    decision: Quantify quality, memory, and throughput trade-offs.
+    decision: Retained as a future quality/memory/throughput ablation; no run is scheduled after the 2026-09-05 GRPO closeout.
 
   - id: S5_public_mix_ablation
     stage: sft_ablation
@@ -240,13 +247,19 @@ experiments:
     evidence: experiments/results/20260901_final_model_decision.json
     model_card: docs/final_model_card.md
     selection_type: project_delivery_checkpoint
+    reaffirmed_on: "2026-09-05"
+    closeout_evidence: experiments/results/20260905_grpo_project_closeout.json
     result: The terminal Base-to-domain-SFT-to-GRPO artifact is selected for delivery; no further training is scheduled.
     attribution: Selection does not establish a statistically significant GRPO gain over SFT and does not change the NO_EXTERNAL_GAIN conclusion.
-    future_work: Mixed-SFT to recall-repair GRPO, projector ablation, and official/human open-answer judging are documented proposals, not completed experiments.
+    future_work: Recall-repair GRPO, projector ablation, official/human open-answer judging, and OPD beyond teacher v1 qualification are deferred proposals, not completed experiments.
 
   - id: O1_multimodal_opd_round1
     stage: on_policy_distillation
-    status: teacher_v1_failed_prompt_v2_smoke_ready
+    status: deferred
+    deferred_on: "2026-09-05"
+    last_completed_gate: teacher_v1_qualification_failed
+    prompt_v2_status: code_ready_no_reported_gpu_result
+    closeout_evidence: experiments/results/20260905_grpo_project_closeout.json
     incumbent: outputs/grpo_qlora_48g_domain_v1/final_adapter
     student_model: Qwen/Qwen3-VL-4B-Instruct
     teacher_model: Qwen/Qwen3-VL-32B-Instruct
@@ -263,5 +276,6 @@ experiments:
     isolation: Teacher qualification and development use disjoint 256-row val panels grouped by image content; internal/public final tests are excluded from selection and training.
     objective: Sparse forward KL over teacher top-16 probabilities plus a residual tail bucket on exact student-generated multimodal prefixes.
     stop_condition: Do not load GPUs before model/data/interface audits; do not train if teacher qualification fails; never start round 2 automatically.
-    result: Real 256-row inference completed for both models, but teacher v1 overall/numeric recall 0.391326/0.277669 failed against student 0.835343/0.628906. No OPD rollout or adapter exists; only a 28-row training-only prompt-v2 smoke is authorized.
+    result: Real 256-row inference completed for both models, but teacher v1 overall/numeric recall 0.391326/0.277669 failed against student 0.835343/0.628906. No OPD rollout or adapter exists; prompt v2 has code and local tests but no reported GPU result.
+    decision: Deferred at the user's 2026-09-05 GRPO closeout under the compute budget. The prompt-v2 smoke and qualification retry are no longer scheduled; retain code and failed evidence for future work. This does not establish that OPD is ineffective or that LoRA capacity is the bottleneck.
     evidence: experiments/results/20260903_opd_teacher_qualification_v1_summary.json

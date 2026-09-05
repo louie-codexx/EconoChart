@@ -58,6 +58,7 @@
 - `completed`：产物、指标、案例和结论齐全；
 - `rejected`：实验完成但假设不被支持；
 - `stopped`：根据预设停止条件主动结束。
+- `deferred`：按预算或范围决定转为未来工作，不再安排运行；已完成的子步骤与失败结果仍独立保留。
 
 不要把失败实验删掉，也不要把 `code_ready` 写成“实验已完成”。
 
@@ -80,16 +81,17 @@
 
 ## 项目最终摘要
 
-项目于 2026-09-01 收束，交付 checkpoint 为 `Base → Domain SFT → GRPO R1` 的最终 adapter。公开结果目录额外保留：
+项目于 2026-09-01 选定 `Base → Domain SFT → GRPO R1` 的最终 adapter，随后重开过 OPD 探索，2026-09-05 再次确认以 GRPO 收尾。公开结果目录保留：
 
 - `20260901_mmefinance_pair_summary.json`：Base→mixed-SFT 的 1,171 条开放式金融配对诊断、评分边界与工件哈希；
 - `20260901_final_model_decision.json`：最终模型身份、真实 attribution、未晋升候选和未执行 future work；
+- `20260905_grpo_project_closeout.json`：最新范围决定、OPD 暂停、未来工作与已知限制；取代历史 v2 smoke 下一步，不修改历史指标；
 - `docs/final_model_card.md`：面向部署与面试的模型卡。
 
 最终选择不会追溯改写历史实验决策。mixed-SFT、F2 numeric reward、300-step recall-repair GRPO 和 projector 解冻均是优化建议；除 mixed-SFT 本身外，后续方案没有运行，不能写成实验结果。
 
-## 2026-09-03 OPD 候选阶段
+## OPD 探索记录与 2026-09-05 暂停
 
-项目已重开多模态 on-policy distillation 候选研究。历史 `F0` 的聚合结果和 GRPO adapter 身份保持不变；新阶段单列为 `O1`。真实数据/模型/接口门以及 student/teacher v1 的 256 条资格推理均已完成，但 teacher v1 的 overall/numeric recall `0.391326/0.277669` 低于 student 的 `0.835343/0.628906`，资格失败。当前没有 OPD rollout、teacher score、更新后 adapter 或能力提升结论。
+项目曾重开多模态 on-policy distillation 候选研究，单列为 `O1`。真实数据/模型/接口门以及 student/teacher v1 的 256 条资格推理均已完成，但 teacher v1 的 overall/numeric recall `0.391326/0.277669` 低于 student 的 `0.835343/0.628906`，资格失败。当前没有 OPD rollout、teacher score、更新后 adapter 或能力提升结论。
 
-v1 失败不会被删除或改门：其严格章节标签命中为 `0/256`，同时 numeric recall、trend、risk 也退化。下一步只允许在未见 train prompt 上运行七类任务各 4 条的 prompt-v2 smoke；只有冻结绝对门 PASS 才可对原 256 条做唯一一次 v2 资格复跑，且正式相对阈值与 v1 完全相同。摘要见 `experiments/results/20260903_opd_teacher_qualification_v1_summary.json`，完整执行边界见 `docs/opd_runbook.md`。
+v1 严格章节标签命中为 `0/256`，同时 numeric recall、trend、risk 也偏低；后续 prompt-v2 smoke 与不变的正式资格门仅完成代码准备和本地测试。2026-09-05 按预算与用户决定将 `O1` 设为 `deferred`，不再执行 28 条 smoke、256 条复跑或蒸馏训练。历史摘要 `20260903_opd_teacher_qualification_v1_summary.json` 中的 `next_step` 记录当时计划，已由 `20260905_grpo_project_closeout.json` 取代；历史失败证据和阈值不追溯修改。`docs/opd_runbook.md` 为未来重启保留的复现手册。

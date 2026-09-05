@@ -92,7 +92,9 @@ def _validate_resume_manifest(
     if manifest.get("model") != {"base": model_path, "adapter": adapter_path}:
         raise ValueError("Resume model/adapter differs from the original evaluation run")
     original_config = manifest.get("config", {})
-    for key in ("seed", "data", "generation"):
+    # The same checkpoint path can still produce different predictions when
+    # quantization, dtype, attention, or processor pixel limits change.
+    for key in ("seed", "data", "generation", "model"):
         if original_config.get(key) != config.get(key):
             raise ValueError(f"Resume config field {key!r} differs from the original evaluation run")
 

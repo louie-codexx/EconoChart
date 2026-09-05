@@ -562,7 +562,9 @@ class ExperimentRecordTests(unittest.TestCase):
         self.assertIn("not completed experiments", final["future_work"])
 
         opd = experiments["O1_multimodal_opd_round1"]
-        self.assertEqual(opd["status"], "teacher_v1_failed_prompt_v2_smoke_ready")
+        self.assertEqual(opd["status"], "deferred")
+        self.assertEqual(opd["last_completed_gate"], "teacher_v1_qualification_failed")
+        self.assertEqual(opd["prompt_v2_status"], "code_ready_no_reported_gpu_result")
         self.assertIn("No OPD rollout or adapter", opd["result"])
         self.assertIn("0.391326/0.277669", opd["result"])
         self.assertTrue((ROOT / opd["evidence"]).is_file())
@@ -572,6 +574,16 @@ class ExperimentRecordTests(unittest.TestCase):
         self.assertEqual(opd_summary["runtime"]["teacher_exit_code"], 0)
         self.assertAlmostEqual(opd_summary["required_point_estimate_deltas"]["overall"], -0.444017)
         self.assertFalse(opd_summary["decision"]["opd_rollout_authorized"])
+        closeout = load_json(ROOT / matrix["project_closeout"]["evidence"])
+        self.assertEqual(final["closeout_evidence"], opd["closeout_evidence"])
+        self.assertEqual(opd["closeout_evidence"], matrix["project_closeout"]["evidence"])
+        self.assertEqual(closeout["project_state"], matrix["project_closeout"]["status"])
+        self.assertEqual(closeout["selected_model"]["adapter_path"], final["selected_adapter"])
+        self.assertEqual(closeout["selected_model"]["adapter_sha256"], final["selected_adapter_sha256"])
+        self.assertEqual(closeout["opd"]["teacher_v1_qualification_status"], opd_summary["status"])
+        self.assertFalse(closeout["execution"]["additional_gpu_experiments_scheduled"])
+        for path in closeout["evidence"].values():
+            self.assertTrue((ROOT / path).is_file(), path)
         self.assertTrue((ROOT / opd["data_config"]).is_file())
         self.assertTrue((ROOT / opd["rollout_config"]).is_file())
         self.assertTrue((ROOT / opd["teacher_score_config"]).is_file())
@@ -600,7 +612,7 @@ class ExperimentRecordTests(unittest.TestCase):
         self.assertIn("20260901_mmefinance_pair_summary.json", readme)
         self.assertIn("0.699934", readme)
         self.assertIn("0.282634", readme)
-        self.assertIn("当前候选研究：多模态 OPD", readme)
+        self.assertIn("后续优化方向：多模态 OPD", readme)
         self.assertIn("没有启动 rollout 或训练", readme)
         self.assertIn("20260903_opd_teacher_qualification_v1_summary.json", readme)
         self.assertIn("v1 失败且没有启动 rollout", model_card)
@@ -620,8 +632,8 @@ class ExperimentRecordTests(unittest.TestCase):
         self.assertIn("selected source 与 evaluable 行数", runbook)
         self.assertIn("s5_public_mix_inputs_summary.json", runbook)
         self.assertIn("s5_public_mix_result_summary.json", runbook)
-        self.assertIn("项目重开一个独立的多模态 OPD 候选阶段", runbook)
-        self.assertIn("不会在下载完成后直接训练", runbook)
+        self.assertIn("2026-09-05 GRPO 收尾", runbook)
+        self.assertIn("不再执行已准备的 v2 smoke", runbook)
         self.assertIn(
             "outputs/grpo_qlora_48g_domain_v1/final_adapter", model_card
         )

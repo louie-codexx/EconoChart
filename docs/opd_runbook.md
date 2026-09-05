@@ -1,6 +1,8 @@
-# 双机多模态 OPD 运行手册
+# 双机多模态 OPD 研究手册（已暂停）
 
-本阶段把当前 `Base + GRPO R1 adapter` 作为学生起点，用同系列
+> 2026-09-05 收尾状态：本轮项目以 GRPO R1 交付，OPD 状态为 `deferred`。v1 教师资格失败；v2 仅完成代码与本地测试，尚无提交的真机结果。本手册保留历史方案和未来复现步骤，后文命令均不属于当前执行计划；此前安排的 28 条 smoke 与 256 条复跑已取消。决定见 [收尾记录](../experiments/results/20260905_grpo_project_closeout.json)。
+
+保留的方案把 `Base + GRPO R1 adapter` 作为学生起点，用同系列
 `Qwen3-VL-32B-Instruct` 作为候选教师。目标是做可审计的多模态 on-policy
 distillation，而不是把教师完整回答当作新的 SFT 固定答案。
 
@@ -40,7 +42,7 @@ Markdown 标题而非 `【结论】` 等机器协议；同时复杂任务经常�
 v2 使用独立目录；可提交摘要见
 `experiments/results/20260903_opd_teacher_qualification_v1_summary.json`。
 
-## 执行顺序
+## 历史执行与未来重启顺序（当前不执行）
 
 1. 无卡：两台主机对齐同一 Git commit，构建并审计 OPD 数据；教师模型下载完成后运行模型快照审计和 4B/32B 接口兼容性检查。（已完成）
 2. 48GB GPU：在 `teacher_qualification_256.jsonl` 上评测冻结的 GRPO-4B student v1。（已完成，保留）
@@ -56,9 +58,9 @@ v2 使用独立目录；可提交摘要见
 12. 48GB GPU：在冻结的 `opd_development_256.jsonl` 上分别评测原 GRPO 基线和 round-1 候选；完成后关闭 GPU。
 13. 无卡：运行 paired development gate。通过仅表示 round-1 可晋升为最终候选并允许人工评估 round-2 成本；代码不会自动启动 round 2。失败则保留原 GRPO R1 为最终模型。
 
-## teacher prompt v2 的低成本恢复路线
+## teacher prompt v2 的保留恢复路线（当前不执行）
 
-先保持 96GB 实例为无卡模式，拉取最新代码并只审计 28 条 train smoke 的输入身份：
+仅在未来决定重启该方向时，先使用 96GB 实例的无卡模式，拉取对应复现代码并审计 28 条 train smoke 的输入身份：
 
 ```bash
 cd /root/autodl-tmp/EconoChart

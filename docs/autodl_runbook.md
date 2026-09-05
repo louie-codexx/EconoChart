@@ -2,6 +2,8 @@
 
 本手册的目标是让每次昂贵 GPU 运行都有前置检查、明确产物和停止条件。命令默认在 AutoDL 的 EconoChart 仓库根目录执行。
 
+> 2026-09-05：本轮已在 GRPO R1 收尾，不再安排新增训练或 OPD 预检/推理。以下是历史复现手册，当前交付与工件保留范围见第 13 节。
+
 ## 0. 同步代码，但不覆盖实验产物
 
 ```bash
@@ -15,6 +17,7 @@ git pull --ff-only origin main
 
 ```bash
 python -m pip install -e .
+unset ECONOCHART_ADAPTER_PATH
 export ECONOCHART_MODEL_PATH=/root/autodl-tmp/models/Qwen3-VL-4B-Instruct
 
 # 旧 v1 数据被 Git 忽略，本地删除不会随 pull 传播；先预览精确目标，再确认清理。
@@ -335,9 +338,9 @@ econochart-grpo --config configs/train/grpo_qlora_48g.yaml
 4. 写出结论、局限、是否继续与下一实验；
 5. 只把人工整理后的轻量记录和图表提交到 Git，不提交 outputs/checkpoint。
 
-## 13. 2026-09-01 历史收口状态与 2026-09-02 OPD 重开
+## 13. 2026-09-05 GRPO 收尾与工件保留
 
-截至 2026-09-01，项目曾在下列交付身份上完成收口：
+本轮项目固定使用下列交付身份；2026-09-01 的模型选择经本次收尾再次确认：
 
 ```text
 base:    /root/autodl-tmp/models/Qwen3-VL-4B-Instruct
@@ -349,6 +352,8 @@ chain:   Base → Domain SFT → GRPO R1
 
 Mixed-SFT 与 MME-Finance 不属于自动执行队列。它们已经形成优化诊断：短答案、OCR、实体识别和吞吐改善，但 ChartQAPro 非劣证据不足且 MME-Finance numeric recall 明显下降；不能用 MME-Finance 反复选参。
 
-2026-09-02 项目重开一个独立的多模态 OPD 候选阶段，但 GRPO R1 仍是当前 incumbent。OPD 不沿用旧的自动命令队列，也不会在下载完成后直接训练；先执行无卡数据/模型/接口审计，再按教师资格 → 学生 rollout → 教师前缀评分 → 学生 KL 更新 → 冻结 development gate 的顺序逐门放行。具体命令、双机工件契约和何时需要 GPU 见 `docs/opd_runbook.md`。
+2026-09-02 曾重开多模态 OPD，后完成双机审计和 v1 资格推理；32B teacher 未达资格门，没有生成 OPD rollout 或更新后的 adapter。2026-09-05 根据预算决定将该方向设为 `deferred`，不再执行已准备的 v2 smoke 或 256 条复跑。`docs/opd_runbook.md` 保留未来重启所需的技术步骤，不是当前命令队列。
 
-完整最终口径见 `docs/final_model_card.md`、`experiments/results/20260901_final_model_decision.json` 和 `experiments/results/20260901_mmefinance_pair_summary.json`。
+当前无需为收尾开启 GPU 或重跑上述命令。已完成的 OPD v1 预测、metrics、日志与模型审计应与 GRPO 原工件一起保留；关机与删除实例、释放磁盘是不同操作，清理工件不属于本次收尾。
+
+完整最终口径见 `docs/final_model_card.md`、`experiments/results/20260901_final_model_decision.json`、`experiments/results/20260905_grpo_project_closeout.json` 和 `experiments/results/20260901_mmefinance_pair_summary.json`。

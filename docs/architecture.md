@@ -122,3 +122,5 @@ Mixed-SFT 是从 Base 独立启动的数据混合消融，不是 GRPO 的上游�
 3. **诊断分支**：mixed-SFT 与 MME-Finance 用于定位外部短答、效率和数值覆盖 trade-off，并生成未执行的下一轮实验方案。
 
 如果未来重开训练，新的 recall-repair GRPO 必须拥有独立 config/output/manifest，先通过 300-step pilot，再进入正式预算，不能覆盖现有 R1 或把建议写成已完成结果。
+
+多模态 OPD 的 `distillation/` 模块和 `configs/opd/` 属于保留的研究扩展：数据/模型/接口审计和 v1 教师资格推理已完成，教师未达门槛，尚无蒸馏后的模型。2026-09-05 以 GRPO 收尾后，OPD 与其 prompt-v2 smoke 均转为未来工作，不是加载最终 adapter 的依赖步骤。

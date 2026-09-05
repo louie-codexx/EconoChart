@@ -8,7 +8,7 @@
 - 最终 adapter：`outputs/grpo_qlora_48g_domain_v1/final_adapter`
 - adapter SHA-256：`d47c083114e26000c1df5bd52676a1ca9dc2ca708a70c7944c97b3824404486b`
 - 训练链：`Base → Domain QLoRA SFT → GRPO R1`
-- 状态：当前已审计 incumbent；后续 OPD 候选尚未训练，未改变本模型身份
+- 状态：2026-09-05 本轮项目已收尾；GRPO R1 为最终交付，OPD 与其他新增实验转为未来优化
 
 adapter 不是独立模型权重。推理时必须先加载同一 Qwen3-VL-4B-Instruct 基座，再挂载该 LoRA adapter；仓库不提交基座、adapter、checkpoint 或逐条预测。
 
@@ -16,7 +16,7 @@ adapter 不是独立模型权重。推理时必须先加载同一 Qwen3-VL-4B-In
 
 这是既定后训练主线的最终、可重载工件：3,600 个 prompt、每题 4 个 generation，共 14,400 次 rollout；最终 504 个 adapter 张量、33,030,144 个可训练参数全部通过有限性与重载审计。它把 Base 的内部 overall 从 `0.349780` 推进到最终 `0.806343`，并在 RL 参数实际更新后保持强 SFT 的总体能力，完整交付了 SFT→GRPO 研究链。
 
-固定 2,496 条内部测试上，GRPO overall 为 `0.806343`；相对正式 SFT 的 paired delta 为 `-0.000157`，95% CI `[-0.002294, 0.002112]`。因此可以确认最终 RL 工件没有统计可确认的总体退化；同时，现有证据没有建立 GRPO 的独立增益。Base→GRPO 的 `+0.456563` 是 SFT 与 GRPO 的累计变化，不能全部归因于 RL。
+固定 2,496 条内部测试上，GRPO overall 为 `0.806343`；相对正式 SFT 的 paired delta 为 `-0.000157`，95% CI `[-0.002294, 0.002112]`。现有证据没有建立 GRPO 的独立增益，也没有建立显著退化；区间跨 0 不等于已证明等效或非劣。Base→GRPO 的 `+0.456563` 是 SFT 与 GRPO 的累计变化，不能全部归因于 RL。
 
 ## 训练与 RL 证据
 
@@ -62,7 +62,7 @@ Mixed-SFT 从同一 Base 独立训练，加入 3,200 条 ChartQA 后，ChartQA e
 
 ## 如果继续优化
 
-优先方案不是直接再跑一轮完整训练，而是：
+以下是未来有预算时可研究的方案，本轮不安排执行。召回修复的一条具体路线是：
 
 1. 从 mixed-SFT adapter 启动 300-step recall-repair GRPO pilot；
 2. 把当前等权 numeric F1 改为偏重召回的 F2，同时保留 supported-number precision，避免数字倾倒；
@@ -71,12 +71,13 @@ Mixed-SFT 从同一 Base 独立训练，加入 3,200 条 ChartQA 后，ChartQA e
 
 如果错误进一步定位为 OCR、刻度或密集标签读取，再单独解冻 projector；只有 projector 仍不足时才考虑视觉塔。开放式建议与证据质量最终仍需要官方图像感知 judge 或人工偏好评测。
 
-项目于 2026-09-02 重开独立的多模态 OPD 候选研究。2026-09-03 的真实资格推理中，32B teacher v1 明确低于本 adapter 驱动的 4B student，故 v1 失败且没有启动 rollout；当前只允许用 training-only smoke 验证 prompt v2。除非 v2 通过不变的 256 条资格门，并继续完成学生 rollout、教师前缀评分、KL 更新和冻结开发门，否则不会替换本卡中的 incumbent。执行边界见 [OPD 手册](opd_runbook.md)。
+多模态 OPD 也保留为独立优化方向。2026-09-03 的 256 条资格推理中，32B teacher v1 明确低于本 adapter 驱动的 4B student，故 v1 失败且没有启动 rollout。prompt v2 与 training-only smoke 已完成代码和本地测试，尚无提交的真机 v2 结果；2026-09-05 按预算与项目范围决定暂停，不再执行 smoke、资格复跑或 OPD 更新。已有审计与失败记录保留。若未来重启，先验证教师协议和任务能力，再评估蒸馏收益；不能把当前失败推广成“OPD 无效”或“少量可训练参数必然无效”。历史方案见 [OPD 手册（已暂停）](opd_runbook.md)。
 
 ## 使用范围与限制
 
 - 适合：数字经济经营图表分析、可审计实验演示、SFT/GRPO 研究复现。
 - 不适合：未经人工复核的投资建议、真实企业决策或把自动指标当作事实保证。
 - 没有证明：GRPO 相对强 SFT 的统计显著增益、广泛外部分布提升、官方 MME-Finance 得分或生产就绪性。
+- 开放式长报告的建议—证据人工非退化与独立 seed 复跑尚未完成，作为本轮收尾的已知限制保留。
 
-聚合证据见 [GRPO 内部摘要](../experiments/results/20260828_grpo_internal_summary.json)、[公开外部摘要](../experiments/results/20260830_external_generalization_summary.json)、[Mixed-SFT 摘要](../experiments/results/20260831_s5_public_mix_result_summary.json)、[MME-Finance 摘要](../experiments/results/20260901_mmefinance_pair_summary.json) 与 [最终选择摘要](../experiments/results/20260901_final_model_decision.json)。
+聚合证据见 [GRPO 内部摘要](../experiments/results/20260828_grpo_internal_summary.json)、[公开外部摘要](../experiments/results/20260830_external_generalization_summary.json)、[Mixed-SFT 摘要](../experiments/results/20260831_s5_public_mix_result_summary.json)、[MME-Finance 摘要](../experiments/results/20260901_mmefinance_pair_summary.json)、[最终选择摘要](../experiments/results/20260901_final_model_decision.json) 与 [2026-09-05 收尾决定](../experiments/results/20260905_grpo_project_closeout.json)。

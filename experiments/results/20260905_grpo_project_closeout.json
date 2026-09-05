@@ -1,0 +1,64 @@
+{
+  "decision_id": "econochart_grpo_closeout_20260905",
+  "decided_on": "2026-09-05",
+  "status": "completed",
+  "project_state": "closed_at_grpo_no_further_training",
+  "selection_type": "project_delivery_checkpoint",
+  "selected_model": {
+    "base_model": "Qwen/Qwen3-VL-4B-Instruct",
+    "adapter_path": "outputs/grpo_qlora_48g_domain_v1/final_adapter",
+    "adapter_sha256": "d47c083114e26000c1df5bd52676a1ca9dc2ca708a70c7944c97b3824404486b"
+  },
+  "decision_basis": [
+    "The user chose to close this project at the audited Base-to-domain-SFT-to-GRPO R1 artifact under the available compute budget.",
+    "Teacher v1 failed the frozen qualification gate; no OPD capability gain has been established.",
+    "Further teacher adaptation and distillation remain future research directions, not current execution steps."
+  ],
+  "opd": {
+    "status": "deferred",
+    "teacher_v1_qualification_status": "failed",
+    "completed_scope": [
+      "Implementation and local tests of the multimodal OPD pipeline",
+      "Real data, model snapshot and student-teacher interface audits",
+      "Student and teacher v1 inference on the frozen 256-row validation qualification panel"
+    ],
+    "prompt_v2_status": "code_ready_no_reported_gpu_result",
+    "prompt_v2_smoke_scheduled": false,
+    "qualification_v2_scheduled": false,
+    "rollouts_started": false,
+    "student_update_started": false,
+    "source_and_failed_evidence_retained": true,
+    "superseded_next_step": "training_only_task_balanced_prompt_v2_smoke"
+  },
+  "future_work_not_scheduled": [
+    "Teacher task adaptation and prompt protocol validation before any OPD retry",
+    "Recall-oriented reward and a small-budget GRPO pilot",
+    "Projector or vision ablation only after localized visual error evidence",
+    "Human or image-aware evaluation of open-ended evidence and recommendations"
+  ],
+  "claim_boundaries": {
+    "historical_metrics_and_model_identity_unchanged": true,
+    "incremental_grpo_gain_established": false,
+    "external_generalization_gain_established": false,
+    "opd_effectiveness_assessed_after_training": false,
+    "limited_trainable_parameters_proven_bottleneck": false,
+    "qualification_panel_is_final_test": false,
+    "production_readiness_established": false,
+    "remaining_limitations": [
+      "The SFT-to-GRPO confidence interval crosses zero; this does not prove equivalence or non-inferiority.",
+      "Open-report human non-regression review and independent-seed replication were not completed.",
+      "MME-Finance compared Base with mixed-SFT, not the final GRPO adapter, and used surrogate rather than official judge scores."
+    ]
+  },
+  "execution": {
+    "additional_gpu_experiments_scheduled": false,
+    "additional_training_scheduled": false,
+    "artifact_deletion_requested": false
+  },
+  "evidence": {
+    "previous_final_selection": "experiments/results/20260901_final_model_decision.json",
+    "grpo_internal": "experiments/results/20260828_grpo_internal_summary.json",
+    "external_generalization": "experiments/results/20260830_external_generalization_summary.json",
+    "teacher_v1": "experiments/results/20260903_opd_teacher_qualification_v1_summary.json"
+  }
+}
